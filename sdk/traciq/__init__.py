@@ -1,0 +1,72 @@
+"""
+TraceIQ Python SDK
+Trace ingestion and evaluation for LLM applications.
+"""
+
+from .client import TraceIQClient, Trace, Span
+from .decorators import traciq_trace, TraceContext
+
+# Convenience aliases
+trace = traciq_trace
+
+
+def score(name: str):
+    """Decorator to mark a function as a scoring function.
+
+    Usage::
+
+        @score(name="accuracy")
+        def accuracy(output, expected):
+            return 1.0 if output == expected else 0.0
+    """
+    import functools
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            return fn(*args, **kwargs)
+        wrapper._score_name = name
+        return wrapper
+
+    return decorator
+
+
+def init(api_key: str, base_url: str = "http://localhost:8000") -> TraceIQClient:
+    """Create and return a configured TraceIQClient.
+
+    Usage::
+
+        import traciq
+        client = traciq.init(api_key="traciq_...", base_url="http://localhost:8000")
+        client.trace(project_name="my_project", model="gpt-4o", input_data=..., output_data=...)
+        client.flush()
+    """
+    return TraceIQClient(api_key=api_key, base_url=base_url)
+
+
+# Integrations (optional — only available if dependencies are installed)
+try:
+    from .integrations.openai import patch_openai
+    from .integrations.anthropic import patch_anthropic
+    from .integrations.langchain import TraceIQCallbackHandler
+    _integrations_available = True
+except ImportError:
+    _integrations_available = False
+
+__version__ = "0.1.0"
+
+__all__ = [
+    # Core
+    "TraceIQClient",
+    "Trace",
+    "Span",
+    "init",
+    "trace",
+    "score",
+    "traciq_trace",
+    "TraceContext",
+    # Integrations (if available)
+    "patch_openai",
+    "patch_anthropic",
+    "TraceIQCallbackHandler",
+]

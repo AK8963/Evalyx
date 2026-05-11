@@ -1,0 +1,61 @@
+groups:
+  - name: traciq_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m]) /
+          rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP error rate (>5%)"
+          description: "Error rate is {{ $value | humanizePercentage }} over 5m"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket[5m])
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 latency (>2s)"
+          description: "p95 latency is {{ $value }}s"
+
+      - alert: BackendDown
+        expr: up{job="traciq_backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend service is down"
+
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+
+      - alert: HighMemoryUsage
+        expr: |
+          container_memory_usage_bytes{container="backend"} /
+          container_spec_memory_limit_bytes{container="backend"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend memory usage > 85%"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} /
+           node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space < 15% remaining"

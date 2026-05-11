@@ -1,0 +1,2 @@
+# SDK requirements
+httpx==0.25.2

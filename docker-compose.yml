@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: traciq_postgres
+    environment:
+      POSTGRES_USER: traciq
+      POSTGRES_PASSWORD: traciq_dev
+      POSTGRES_DB: traciq_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traciq"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: traciq_redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant Vector DB
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: traciq_qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: traciq_backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://traciq:traciq_dev@postgres:5432/traciq_db
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      DEBUG: "True"
+      SECRET_KEY: dev-secret-key-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    volumes:
+      - .:/app
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Streamlit Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: traciq_frontend
+    ports:
+      - "8501:8501"
+    environment:
+      STREAMLIT_SERVER_HEADLESS: "true"
+    depends_on:
+      - backend
+    volumes:
+      - .:/app
+    command: streamlit run frontend/app.py --server.port=8501 --server.address=0.0.0.0
+
+volumes:
+  postgres_data:
+  qdrant_data:
+
+networks:
+  default:
+    name: traciq_network
