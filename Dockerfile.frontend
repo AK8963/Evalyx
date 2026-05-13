@@ -1,36 +1,35 @@
-FROM python:3.11-slim
-
+# ── Stage 1: Install dependencies ──────────────────────────────────────────
+FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+COPY frontend-react/package.json frontend-react/package-lock.json* ./
+RUN npm ci --frozen-lockfile 2>/dev/null || npm install
 
-# Copy requirements
-COPY requirements-frontend.txt .
+# ── Stage 2: Build ──────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+WORKDIR /app
 
-# Install Python dependencies (trusted-host flags handle corporate SSL inspection proxies)
-RUN pip install --no-cache-dir \
-    --trusted-host pypi.org \
-    --trusted-host files.pythonhosted.org \
-    -r requirements-frontend.txt
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend-react/ .
 
-# Copy application code
-COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# Expose port
-EXPOSE 8501
+RUN npm run build
 
-# Create .streamlit directory
-RUN mkdir -p ~/.streamlit
+# ── Stage 3: Run ────────────────────────────────────────────────────────────
+FROM node:20-alpine AS runner
+WORKDIR /app
 
-# Create streamlit config
-RUN echo "[server]\n\
-headless = true\n\
-port = 8501\n\
-enableCORS = false\n\
-" > ~/.streamlit/config.toml
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
 
-# Run frontend
-CMD ["sh", "-c", "cd /app && streamlit run frontend/app.py --server.port=8501 --server.address=0.0.0.0 --server.fileWatcherType=poll"]
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]

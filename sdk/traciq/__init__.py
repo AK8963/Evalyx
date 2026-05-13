@@ -1,13 +1,14 @@
 """
-TraceIQ Python SDK
+TrustBrain Python SDK
 Trace ingestion and evaluation for LLM applications.
 """
 
-from .client import TraceIQClient, Trace, Span
+from .client import TrustBrainClient, Trace, Span
 from .decorators import traciq_trace, TraceContext
 
 # Convenience aliases
 trace = traciq_trace
+TrustBrain = TrustBrainClient  # canonical import alias
 
 
 def score(name: str):
@@ -31,17 +32,17 @@ def score(name: str):
     return decorator
 
 
-def init(api_key: str, base_url: str = "http://localhost:8000") -> TraceIQClient:
-    """Create and return a configured TraceIQClient.
+def init(api_key: str, base_url: str = "http://localhost:8000") -> TrustBrainClient:
+    """Create and return a configured TrustBrainClient.
 
     Usage::
 
-        import traciq
-        client = traciq.init(api_key="traciq_...", base_url="http://localhost:8000")
+        import trustbrain
+        client = trustbrain.init(api_key="tb_...", base_url="http://localhost:8000")
         client.trace(project_name="my_project", model="gpt-4o", input_data=..., output_data=...)
         client.flush()
     """
-    return TraceIQClient(api_key=api_key, base_url=base_url)
+    return TrustBrainClient(api_key=api_key, base_url=base_url)
 
 
 # Integrations (optional — only available if dependencies are installed)
@@ -57,7 +58,8 @@ __version__ = "0.1.0"
 
 __all__ = [
     # Core
-    "TraceIQClient",
+    "TrustBrainClient",
+    "TrustBrain",
     "Trace",
     "Span",
     "init",

@@ -68,3 +68,10 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+
+frontend/
+
+node_modules
+.next
+.env*.local
+npm-debug.log*

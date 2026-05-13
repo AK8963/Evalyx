@@ -70,8 +70,10 @@ class TraceDetailResponse(TraceResponse):
     completion_tokens: Optional[int] = None
     prompt_tokens: Optional[int] = None
     spans: Optional[List[Any]] = None
-    metadata: Optional[dict] = None
+    metadata: Optional[dict] = None   # maps from trace.meta column (avoids SQLAlchemy MetaData)
     scores: Optional[List[dict]] = None
+    error_message: Optional[str] = None
+    environment: Optional[str] = None
     created_at: datetime
 
 
@@ -265,8 +267,28 @@ async def get_trace(
         for s in scores
     ]
     
-    response = TraceDetailResponse.from_orm(trace)
-    response.scores = scores_data
+    response = TraceDetailResponse(
+        id=trace.id,
+        project_id=trace.project_id,
+        input_data=trace.input_data,
+        output_data=trace.output_data,
+        expected_output=trace.expected_output,
+        model=trace.model,
+        status=trace.status,
+        latency_ms=trace.latency_ms,
+        cost_usd=trace.cost_usd,
+        total_tokens=trace.total_tokens,
+        completion_tokens=trace.completion_tokens,
+        prompt_tokens=trace.prompt_tokens,
+        error_message=trace.error_message,
+        environment=getattr(trace, 'environment', None),
+        tags=trace.tags,
+        spans=trace.spans,
+        metadata=trace.meta or {},
+        scores=scores_data,
+        timestamp=trace.timestamp,
+        created_at=trace.created_at,
+    )
     
     return response
 

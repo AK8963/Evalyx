@@ -1,75 +1,132 @@
 # Dashboard Pages Guide
 
-This guide walks through every page in the TraceIQ dashboard — what it shows, how to use it, and what outputs you can get from it.
+This guide walks through every page in the TrustBrain dashboard — what it shows, how to use it, and what outputs you can get from it.
+
+The frontend is a **Next.js 14** React application running at **http://localhost:3010**.
 
 ---
 
 ## Navigation Overview
 
-After logging in, the sidebar displays the active pages. Use the radio buttons to switch between them.
+After logging in the left sidebar contains all pages. Use the project selector in the top bar to switch between projects.
 
-| Page | Icon | Purpose |
+| Page | Path | Purpose |
 |---|---|---|
-| Dashboard | 📊 | High-level health and cost overview for a project |
-| Traces | 📋 | Browse and inspect individual LLM calls |
-| Evaluations | 🧪 | Run and view automated quality scores |
-| Analytics | 📈 | Time-series charts for all key metrics |
-| Experiments | 🧫 | Compare model versions; detect regressions |
-| Gateway | 🌐 | Route LLM calls through TraceIQ; live streaming demo |
-| Review Queue | 🔍 | Human review workflow for flagged traces |
-| Prompts | 📝 | Version-controlled prompt templates |
-| Datasets | 📚 | Curated evaluation datasets |
-| Annotations | ✍️ | Attach human labels to traces |
-| Settings | ⚙️ | API keys and user preferences |
+| Dashboard | `/` | High-level health, cost, and charts for a project |
+| Traces | `/traces` | Browse and deep-inspect individual LLM calls |
+| Analytics | `/analytics` | Time-series charts for all key metrics |
+| Topics | `/topics` | Semantic clustering of traces by topic |
+| Deep Search | `/search` | Full-text and semantic search across traces |
+| Experiments | `/experiments` | Compare model versions; detect regressions |
+| Datasets | `/datasets` | Curated evaluation datasets |
+| Annotations | `/annotations` | Attach human labels to traces |
+| Review Queue | `/review` | Human review workflow for flagged traces |
+| Online Scoring | `/online-scoring` | Real-time scorer rules |
+| Prompts | `/prompts` | Version-controlled prompt templates |
+| Playground | `/playground` | Interactive LLM prompt testing |
+| Gateway | `/gateway` | Route LLM calls through TrustBrain |
+| A/B Tests | `/abtests` | Compare model variants head-to-head |
+| Settings | `/settings` | API keys and user preferences |
 
 ---
 
-## 📊 Dashboard
+## 📊 Dashboard (`/`)
 
 **Purpose:** Instant health snapshot of a project — the first page you open every day.
 
 ### How to Use
-1. Select a project from the sidebar project selector.
-2. Use the **Time range** slider (1–90 days) to control the window.
-3. All charts and metrics update automatically.
+1. Select a project from the top-bar project selector.
+2. The dashboard loads automatically — all data is scoped to the selected project.
 
-### Metrics Row
-| Metric | What it means |
+### KPI Cards (Row 1)
+| Card | What it shows |
 |---|---|
-| Total Traces | All LLM calls received in the time window |
-| Successful | Traces with `status = "success"` |
-| Errors | Traces with `status = "error"` |
-| Avg Latency | Mean end-to-end response time (ms) |
+| Total Traces | All LLM calls received |
+| Success Rate | `(total - errors) / total × 100%` |
+| Avg Latency | Mean end-to-end response time |
 | Total Cost | Sum of `cost_usd` across all traces |
-| Evaluations | Number of evaluation runs created |
+
+### KPI Cards (Row 2)
+| Card | What it shows |
+|---|---|
+| Total Tokens | Sum of all tokens consumed |
+| Error Count | Number of traces with `status = "error"` |
+| Models Active | Distinct model names in the project |
+| Cost / Trace | Average cost per call |
 
 ### Charts
-| Chart | What it shows |
-|---|---|
-| Traces per Day | Bar chart of daily call volume |
-| Success vs Errors | Stacked bar — green = success, red = error |
-| Avg Latency (ms) | Line chart of daily average latency |
-| Token Usage per Day | Area chart of total tokens consumed daily |
-| Cost (USD) per Day | Step-line chart of daily spend |
-| Traces by Model | Horizontal bar — which models are used most |
-| Avg Latency by Model | Bar chart comparing latency per model |
-| Tokens vs Latency | Bubble scatter — spot expensive/slow models |
+| Chart | Type | What it shows |
+|---|---|---|
+| Daily Trace Volume | Grouped bar | Success vs error count per day |
+| Avg Latency Trend | Area | Daily mean latency in milliseconds |
+| Daily Cost | Area | Cumulative spend per day |
+| Token Usage | Area | Total tokens consumed per day |
+| Traces by Model | Pie | Share of calls per model |
+| Avg Latency by Model | Horizontal bar | Per-model latency comparison |
+| Model Performance | Table | Traces, avg latency, avg cost, tokens, error rate per model |
+| Error Count Over Time | Area sparkline | Daily error count (only shown when errors > 0) |
 
 ### Recent Traces Table
-Shows the 10 most recent traces with ID, model, status, latency, cost, and date.
+Bottom of the page — shows the 10 most recent traces with ID, model, status, latency, cost, and timestamp.
 
 ---
 
-## 📋 Traces
+## 📋 Traces (`/traces`)
 
 **Purpose:** Browse, filter, and deep-inspect every LLM call your application made.
 
 ### How to Use
-1. Use **Filter by Model** to narrow to a specific model (e.g. `gpt-4o`).
+1. Use **Filter by model** to narrow to a specific model (e.g. `gemma2:2b`).
 2. Use the **Status** dropdown to show only errors or successes.
-3. Click the expander arrow on any trace to see the full JSON payload.
+3. Use **Prev / Next** pagination to scroll through all traces (25 per page).
+4. Click any row to open the **Trace Detail Panel** on the right.
 
-### What Each Trace Contains
+### Trace Detail Panel
+
+The panel opens on the right when you click a trace. It contains:
+
+#### Header
+- Full trace ID with a **Copy** button
+- Model name and **environment badge** (e.g. `local-ollama`, `production`, `staging`)
+- Status badge (green = success, red = error)
+
+#### KPI Bar
+| Field | Value |
+|---|---|
+| Latency | End-to-end response time |
+| Tokens | Total token count |
+| Cost | Estimated cost in USD (`<$0.0001` for Ollama) |
+| Time | Timestamp of the trace |
+
+#### ⚡ Execution Timeline
+Visual Gantt chart breaking the total latency into four phases:
+
+| Phase | Color | Estimated from |
+|---|---|---|
+| Queue | Blue | 4% of total latency |
+| Prompt Eval | Violet | Proportional to `prompt_tokens` |
+| Generation | Emerald | Proportional to `completion_tokens` |
+| Post-process | Amber | Remainder |
+
+Each phase shows as a colored bar segment with its duration. A waterfall row shows the phase timeline proportionally.
+
+#### 🔢 Token Breakdown
+A two-tone bar showing the split between **prompt tokens** (violet) and **completion tokens** (emerald), with exact counts.
+
+#### 🏷️ Tags
+Color-coded tag pills — tags come from your application via the `tags` field in the trace payload. The Ollama demo automatically tags with scenario name, model, and turn number.
+
+#### 📥 Input / 📤 Output
+Collapsible sections showing the raw input and output. If the input is a plain `messages[0].content` string, it is displayed as readable text rather than JSON.
+
+#### 🎯 Scores
+Progress bars for each automated scorer result (0–100%). Shown only when scores exist on the trace.
+
+#### 🗂️ Metadata
+Collapsible JSON viewer for the `metadata` dict (excludes `tags` which are shown above).
+
+### What Each Trace Contains in the API Response
+
 | Field | Description |
 |---|---|
 | `id` | Unique trace identifier (UUID) |
@@ -78,63 +135,28 @@ Shows the 10 most recent traces with ID, model, status, latency, cost, and date.
 | `input_data` | The prompt/messages sent |
 | `output_data` | The response received |
 | `expected_output` | Ground-truth answer (if provided) |
-| `latency_ms` | Response time |
-| `total_tokens` | Token count |
-| `cost_usd` | Estimated cost |
-| `scores` | Automated scorer results |
+| `latency_ms` | Response time in ms |
+| `prompt_tokens` | Input token count |
+| `completion_tokens` | Output token count |
+| `total_tokens` | Total tokens |
+| `cost_usd` | Estimated cost (0.0 for Ollama) |
+| `error_message` | Error text when `status = "error"` |
+| `environment` | `production`, `staging`, `dev`, `local-ollama`, etc. |
 | `tags` | Labels from your application |
 | `metadata` | Arbitrary key-value pairs |
 | `spans` | Nested tool calls / pipeline steps |
-| `environment` | `production`, `staging`, `dev`, etc. |
-
-### Output You Can Get
-- Copy the raw trace JSON for debugging
-- Identify which requests are failing (status = error)
-- Find the slowest or most expensive calls
+| `scores` | Automated scorer results |
 
 ---
 
-## 🧪 Evaluations
-
-**Purpose:** Run automated quality scoring on traces and see the results.
-
-### How to Use
-1. Click **Run Evaluation** to create a new eval against your project's traces.
-2. Select a scorer type:
-   - **Exact Match** — checks if output equals expected output
-   - **LLM Judge** — uses an LLM to score quality (requires OpenAI/Anthropic key)
-   - **Code Scorer** — runs a Python function to compute a score (0–1)
-   - **JSON Schema** — validates output against a JSON schema
-3. View scores in the results table.
-
-### Scorer Output
-Each scorer returns a score in the range **0.0 – 1.0** and optional reasoning text:
-
-```json
-{
-  "scorer": "llm_judge",
-  "score": 0.82,
-  "reasoning": "The answer correctly identifies the main topic but misses two supporting details."
-}
-```
-
-### Aggregate Metrics
-- **Average score** per scorer across all evaluated traces
-- **Pass rate** — percentage of traces scoring above a threshold
-- **Score distribution** histogram
-
----
-
-## 📈 Analytics
+## 📈 Analytics (`/analytics`)
 
 **Purpose:** Understand trends in cost, performance, and quality over time.
 
-### Tabs
+### Time Series Tab
+Select a metric and date range to see its daily trend:
 
-#### Time Series
-Select a metric and see its daily trend:
-
-| Metric | Description |
+| Metric key | Description |
 |---|---|
 | `trace_count` | Daily call volume |
 | `error_count` | Daily error count |
@@ -142,48 +164,33 @@ Select a metric and see its daily trend:
 | `total_cost` | Daily total cost (USD) |
 | `total_tokens` | Daily total token usage |
 
-#### Model Breakdown
-Table and bar chart comparing all models used in the project:
-- Number of requests
-- Average latency
-- Total tokens
-- Total cost
+### Model Breakdown Tab
+Table and chart comparing all models in the project:
+- Number of requests, average latency, total tokens, total cost, error rate
 
-#### Score Trends
-Line chart of average scorer results over time, per scorer name. Filter by scorer name to focus on one metric.
-
-#### Cost Analysis
-- Per-model cost breakdown table
-- Bar chart of total spend by model
-- Model pricing reference table (global rates)
-
-### Output You Can Get
-- Identify cost spikes and their source model
-- Track latency regressions after a deployment
-- See if score quality improves or degrades over time
-- Export data via the API for external BI tools
+### Summary
+Overview metrics (`/api/analytics/overview`) returning:
+```json
+{
+  "total_traces": 50,
+  "error_traces": 1,
+  "error_rate": 0.02,
+  "avg_latency_ms": 1240,
+  "total_cost_usd": 0.071,
+  "total_tokens": 8200,
+  "days": 7
+}
+```
 
 ---
 
-## 🧫 Experiments
+## 🧫 Experiments (`/experiments`)
 
 **Purpose:** Create immutable snapshots of evaluation runs and compare model versions over time.
 
-### Tabs
-
-#### All Experiments
-Table of all experiments showing:
-- Name, model, status (pending / running / completed / failed)
-- Completed items vs total
-- Aggregate scores per scorer
-- Lock status (locked experiments cannot be modified)
-- Created date
-
-Click a row to expand results — see per-item scores, inputs, outputs, and latency.
-
-#### Create New
-Form to create an experiment:
-- **Name** — human-readable label (e.g. `"gpt-4o vs gpt-3.5 — May 2026"`)
+### Create New
+Form fields:
+- **Name** — e.g. `"gemma2:2b vs mistral — May 2026"`
 - **Model** — model identifier
 - **Dataset** — optional golden dataset to evaluate against
 - **Scorer configs** — JSON array of scorer definitions
@@ -196,35 +203,10 @@ Form to create an experiment:
 ]
 ```
 
-After creating, submit results via the SDK or API:
-
-```python
-import httpx
-httpx.post("http://localhost:8000/api/experiments/{id}/results", json={
-    "input_data": {"question": "What is 2+2?"},
-    "actual_output": {"answer": "4"},
-    "expected_output": {"answer": "4"},
-    "scores": {"exact_match": {"score": 1.0}},
-    "overall_score": 1.0,
-    "latency_ms": 340,
-}, headers={"X-API-Key": "tiq_..."})
-```
-
-#### Compare
-Select two or more experiments and click **Compare**. Shows a side-by-side table of aggregate scores per scorer.
-
-#### Regression Detection ⭐ Showcase Feature
-
-1. Select the **Current experiment** (the one you just ran).
-2. Select the **Baseline experiment** (the previous version to compare against).
-3. Set a **Regression threshold** (default 5% — a score drop larger than this is flagged).
-4. Click **Detect Regressions**.
-
-**Output:**
-- **REGRESSION DETECTED** banner (red) or **No regression** banner (green)
-- Metrics: regressed scorers, improved scorers, stable scorers
-- Comparison table with baseline score, current score, delta, and severity
-- Bar chart visualising baseline vs current per scorer
+### Regression Detection
+1. Select the **Current** experiment and a **Baseline**.
+2. Set a regression threshold (default 5%).
+3. Results show: regressed scorers, improved scorers, delta table, bar chart.
 
 | Severity | Condition |
 |---|---|
@@ -234,231 +216,132 @@ Select two or more experiments and click **Compare**. Shows a side-by-side table
 
 ---
 
-## 🌐 Gateway
+## 🌐 Gateway (`/gateway`)
 
-**Purpose:** Route LLM calls through TraceIQ's unified proxy — automatically tracks cost, caches identical requests, and supports real-time streaming.
+**Purpose:** Route LLM calls through TrustBrain's unified proxy — traces every call automatically.
 
-### Tabs
+### Streaming
+Tokens appear word-by-word as the model generates them. Shows live token counter and cost.
 
-#### ⚡ Streaming ⭐ Showcase Feature
+### Non-Streaming
+Standard send-and-wait with optional request caching and fallback model chains.
 
-The most visually impressive demo. Tokens appear on-screen one at a time as the model generates them.
-
-1. Enter a **Model** name (e.g. `gpt-3.5-turbo`, `anthropic/claude-3-haiku-20240307`).
-2. Set **Temperature**.
-3. Type a **Message**.
-4. Click **Stream Response**.
-
-**What you see:**
-- Tokens appear word-by-word in a live text box
-- A counter shows `Tokens: 47 | 23.4 tok/s`
-- Final metrics: total tokens, latency, estimated cost
-
-**How it works:** The frontend connects to `POST /api/gateway/stream` using HTTP streaming (SSE — Server-Sent Events). The backend opens a streaming connection to OpenAI or Anthropic and forwards each token chunk to the browser as it arrives.
-
-#### Interactive (non-streaming)
-
-Standard send-and-wait interface:
-- Enter model, temperature, message
-- Optionally enable **Use cache** — identical requests return instantly without hitting the LLM
-- Add **Fallback models** — if the primary model fails, the request is retried with the next one
-- Outputs: full response text, provider, model used, latency, cost
-
-#### Cost & Usage
-- Table of all gateway requests grouped by model
-- Bar chart of cost per model
-- Time range filter (1–30 days)
-
-#### Providers
-Shows which LLM provider API keys are currently configured.
-
-### Gateway API (for direct integration)
+### Gateway API
 
 ```bash
 # Non-streaming
 curl -X POST http://localhost:8000/api/gateway/complete \
-  -H "X-API-Key: tiq_..." \
+  -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"project_id": "...", "model": "gpt-4o", "messages": [{"role":"user","content":"Hello"}], "use_cache": true}'
+  -d '{"project_id": "...", "model": "gpt-4o", "messages": [{"role":"user","content":"Hello"}]}'
 
 # Streaming (SSE)
 curl -X POST http://localhost:8000/api/gateway/stream \
-  -H "X-API-Key: tiq_..." \
-  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt>" \
   --no-buffer \
   -d '{"project_id": "...", "model": "gpt-4o", "messages": [{"role":"user","content":"Tell me a story"}]}'
 ```
 
-Streaming response format (one line per token):
-```
-data: {"token": "Once", "done": false}
-data: {"token": " upon", "done": false}
-data: {"token": " a", "done": false}
-...
-data: {"token": "", "done": true, "total_tokens": 87, "latency_ms": 1240, "cost_usd": 0.000131}
-```
-
 ---
 
-## 🔍 Review Queue ⭐ Showcase Feature
+## 🔍 Review Queue (`/review`)
 
-**Purpose:** Human review workflow — flag traces that need a human's eyes, assign them to reviewers, and track approval/rejection decisions.
+**Purpose:** Human review workflow — flag traces that need a human's eyes, assign reviewers, track decisions.
 
 ### Stats Bar
-| Metric | Description |
-|---|---|
-| Total | All review tasks ever created |
-| Backlog | Pending + In Review (work to be done) |
-| Pending | Not yet picked up |
-| In Review | Currently being reviewed |
-| Resolved | Approved + Rejected |
+Shows counts by status: Total, Backlog (pending + in_review), Pending, In Review, Resolved.
 
-### Filtering
-- **Show status** — filter by pending, in_review, approved, rejected, escalated
-- **Priority** — filter by critical, high, medium, low
+### Auto-Flag
+Set a score threshold and click **Flag low scores** — traces scoring below the threshold are automatically added to the queue with priority `critical / high / medium` based on severity.
 
-### Auto-Flag Button
-Set a **Score threshold** (e.g. 0.5) and click **Flag low scores**. TraceIQ will scan your recent traces, find those with `overall_score < threshold`, and automatically create review tasks for any not already in the queue.
-
-| Score Range | Priority assigned |
-|---|---|
-| < 0.30 | critical 🔴 |
-| 0.30 – 0.40 | high 🟠 |
-| 0.40 – threshold | medium 🟡 |
-
-### Task Cards
-Each card shows:
-- Priority icon and status
-- Linked trace ID and score at flagging time
-- Threshold that was violated
-- Reviewer notes (if any)
-
-### Actions
+### Task Actions
 
 | Button | Effect |
 |---|---|
-| ✅ Approve | Marks trace as acceptable; records `reviewed_at` timestamp |
-| ❌ Reject | Marks trace as unacceptable; records `reviewed_at` timestamp |
+| ✅ Approve | Marks acceptable; records `reviewed_at` |
+| ❌ Reject | Marks unacceptable; records `reviewed_at` |
 | 🚨 Escalate | Escalates to a senior reviewer |
-| 👁 Start Review | Moves task from `pending` → `in_review` |
-
-### Detail Expander
-Click **Details & Notes** on any task to:
-- View the full trace input and output
-- View the scores that triggered the flag
-- Write or edit reviewer notes
-- Save notes with **Save notes**
-
-### Create Manual Task
-Use the **Create manual review task** form to flag any trace or create a standalone task without a trace link.
-
-### Output / Audit Trail
-- All status changes are timestamped
-- `reviewed_at` is recorded when approved or rejected
-- **Stats endpoint** (`/api/review/stats`) returns aggregate counts by status, priority, and reason — useful for SLA reporting
+| 👁 Start Review | Moves `pending` → `in_review` |
 
 ---
 
-## 📝 Prompts
+## 📝 Prompts (`/prompts`)
 
-**Purpose:** Store, version, and reuse prompt templates across your application.
+**Purpose:** Store, version, and reuse prompt templates.
 
-### How to Use
-1. Click **New Prompt** and give it a name and a template body.
-2. Use `{{variable_name}}` syntax for dynamic values.
-3. Save it — TraceIQ assigns a version number (v1, v2, …).
-4. In your application, fetch the latest prompt via API:
+Use `{{variable_name}}` syntax for dynamic values. Fetch the latest version via API:
 
 ```bash
 curl "http://localhost:8000/api/prompts?project_id=...&name=my-prompt" \
-  -H "X-API-Key: tiq_..."
+  -H "Authorization: Bearer <jwt>"
 ```
-
-5. Fill in variables and send to your LLM.
-
-### Output You Can Get
-- Full version history of every prompt
-- Diff between versions
-- Which traces used which prompt version (via metadata tagging)
 
 ---
 
-## 📚 Datasets
+## 📚 Datasets (`/datasets`)
 
 **Purpose:** Build curated golden datasets of (input, expected output) pairs for repeatable evaluation.
 
-### How to Use
-1. **Create a Dataset** — give it a name and optional description.
-2. **Add Items** — manually enter input/expected output pairs, or import from existing traces.
-3. **Link to Experiments** — when creating an Experiment, select a dataset. The experiment runs each dataset item through your model and scores the output against `expected_output`.
-
-### Output You Can Get
-- Consistent benchmark you can re-run after every model change
-- Pass/fail breakdown per dataset item
-- Track which items a model consistently gets wrong
+1. Create a dataset and add items manually or import from existing traces.
+2. Link to an Experiment — the experiment scores each item against `expected_output`.
 
 ---
 
-## ✍️ Annotations
+## ✍️ Annotations (`/annotations`)
 
-**Purpose:** Attach human-written labels and scores to individual traces — the ground truth for training and evaluation.
+**Purpose:** Attach human-written labels and ratings to individual traces.
 
-### How to Use
-1. Open the Annotations page and select a project.
-2. Traces are listed for annotation.
-3. For each trace, set a **score** (0–1 slider) and write a **comment**.
-4. Save — the annotation is stored and linked to the trace.
+Supported annotation types: `rating` (thumbs up/down), `general` (free text comment).
 
-### Output You Can Get
-- Human-labeled dataset exportable via `/api/export`
-- Comparison between human scores and automated scorer scores (inter-rater reliability)
-- Use annotations as `expected_output` for future evaluations
+Annotations are stored and can be used as `expected_output` for future evaluations, or for inter-rater reliability analysis.
 
 ---
 
-## ⚙️ Settings
+## ⚙️ Settings (`/settings`)
 
-**Purpose:** Manage your API keys — both your TraceIQ API key (for sending traces) and provider keys (for the Gateway).
+**Purpose:** Manage API keys.
 
-### Your TraceIQ API Key
-- Displayed at the top of the page.
-- Click **Generate New Key** to rotate it.
-- Use this key in your application's `X-API-Key` header or SDK constructor.
+### TrustBrain API Key
+- Your static API key for programmatic trace ingestion.
+- Format: `traciq_<base64-random>`
+- Use in `Authorization: Bearer <key>` headers.
 
 ### Provider API Keys
-Add keys for OpenAI, Anthropic, Google, or Ollama. These are used by the **Gateway** page when routing requests to LLM providers.
-
-- Each key is stored encrypted per-user in the database.
-- User-level keys take precedence over server-level environment variables.
-- Click **Delete** to remove a key.
+Add keys for OpenAI, Anthropic, Google, or Ollama. User-level keys take precedence over server environment variables.
 
 ---
 
 ## API Endpoints Quick Reference
 
+All endpoints are prefixed with `/api/`. No `/v1/` prefix.
+
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/traces` | POST | Ingest a single trace |
-| `/api/traces/batch` | POST | Ingest multiple traces |
-| `/api/traces` | GET | List traces for a project |
-| `/api/traces/{id}` | GET | Get a single trace |
-| `/api/evals` | POST | Create an evaluation |
-| `/api/evals` | GET | List evaluations |
-| `/api/experiments/` | POST | Create an experiment |
-| `/api/experiments/{id}/results` | POST | Submit experiment results |
-| `/api/experiments/{id}/regression` | GET | Run regression detection |
-| `/api/gateway/complete` | POST | Non-streaming LLM call |
-| `/api/gateway/stream` | POST | Streaming LLM call (SSE) |
+| `/api/auth/register` | POST | Register a new user, get JWT |
+| `/api/auth/login` | POST | Login by email, get JWT |
+| `/api/auth/me` | GET | Get current user info + API key |
+| `/api/projects` | GET / POST | List or create projects |
+| `/api/traces` | GET / POST | List or ingest traces |
+| `/api/traces/{id}` | GET | Get a single trace with detail panel data |
+| `/api/evals` | GET / POST | List or create evaluations |
+| `/api/experiments` | GET / POST | List or create experiments |
+| `/api/datasets` | GET / POST | List or create datasets |
+| `/api/datasets/{id}/items` | GET / POST | List or add dataset items |
+| `/api/annotations/` | GET / POST | List or create annotations |
+| `/api/prompts/` | GET / POST | List or create prompts |
+| `/api/analytics/overview` | GET | Summary metrics (total traces, cost, etc.) |
+| `/api/analytics/timeseries` | GET | Daily metric time-series |
+| `/api/analytics/models` | GET | Per-model breakdown |
+| `/api/gateway/complete` | POST | Non-streaming LLM call via gateway |
+| `/api/gateway/stream` | POST | Streaming LLM call (SSE) via gateway |
 | `/api/review/tasks` | POST | Create a review task |
 | `/api/review/queue` | GET | Get pending review tasks |
 | `/api/review/tasks/{id}` | PATCH | Update task status/notes |
 | `/api/review/auto-flag` | POST | Auto-flag low-score traces |
 | `/api/review/stats` | GET | Review queue statistics |
-| `/api/analytics/overview` | GET | Summary metrics |
-| `/api/analytics/timeseries` | GET | Daily metric time-series |
-| `/api/analytics/models` | GET | Per-model breakdown |
-| `/api/prompts` | GET/POST | List or create prompts |
-| `/api/datasets/` | GET/POST | List or create datasets |
-| `/api/projects` | GET/POST | List or create projects |
+| `/api/search/keyword` | GET | Full-text keyword search across traces |
+| `/api/settings/api-keys` | GET / POST | List or store API keys |
 
 Full interactive documentation: **http://localhost:8000/docs**
+
+---

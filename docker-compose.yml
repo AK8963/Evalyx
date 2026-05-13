@@ -4,7 +4,7 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: traciq_postgres
+    container_name: trustbrain_postgres
     environment:
       POSTGRES_USER: traciq
       POSTGRES_PASSWORD: traciq_dev
@@ -22,7 +22,7 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: traciq_redis
+    container_name: trustbrain_redis
     ports:
       - "6380:6379"
     healthcheck:
@@ -34,7 +34,7 @@ services:
   # Qdrant Vector DB
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: traciq_qdrant
+    container_name: trustbrain_qdrant
     ports:
       - "6333:6333"
     volumes:
@@ -50,7 +50,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: traciq_backend
+    container_name: trustbrain_backend
     ports:
       - "8000:8000"
     environment:
@@ -70,21 +70,21 @@ services:
       - .:/app
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
-  # Streamlit Frontend
+  # Next.js React Frontend
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: traciq_frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: trustbrain_frontend
     ports:
-      - "8501:8501"
+      - "3010:3000"
     environment:
-      STREAMLIT_SERVER_HEADLESS: "true"
+      BACKEND_API_URL: http://trustbrain_backend:8000
+      NODE_ENV: production
     depends_on:
       - backend
-    volumes:
-      - .:/app
-    command: streamlit run frontend/app.py --server.port=8501 --server.address=0.0.0.0
 
 volumes:
   postgres_data:
@@ -92,4 +92,4 @@ volumes:
 
 networks:
   default:
-    name: traciq_network
+    name: trustbrain_network

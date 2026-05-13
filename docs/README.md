@@ -1,10 +1,10 @@
-# TraceIQ — Documentation Overview
+# TrustBrain — Documentation Overview
 
-TraceIQ is a self-hosted LLM observability platform. It captures every input/output your AI application sends to a language model, scores them, and surfaces insights through a rich dashboard. Think of it as a private, on-premise alternative to Braintrust or LangSmith.
+TrustBrain is a self-hosted LLM observability platform. It captures every input/output your AI application sends to a language model, scores them, and surfaces insights through a rich React dashboard. Think of it as a private, on-premise alternative to Braintrust or LangSmith.
 
 ---
 
-## What TraceIQ Does
+## What TrustBrain Does
 
 | Capability | Description |
 |---|---|
@@ -17,6 +17,7 @@ TraceIQ is a self-hosted LLM observability platform. It captures every input/out
 | **Prompt Management** | Version-controlled prompt templates with variable substitution |
 | **Datasets & Annotations** | Curate golden datasets from real traces; add human labels |
 | **Analytics** | Time-series charts for latency, cost, token usage, and score trends |
+| **Ollama Support** | Send traces from any local Ollama model — cost tracked as $0.00 |
 
 ---
 
@@ -33,24 +34,25 @@ TraceIQ is a self-hosted LLM observability platform. It captures every input/out
 ## Architecture at a Glance
 
 ```
-Your Application
+Your Application  (or examples/ollama_live_demo/live_demo.py)
       │
       │  HTTP POST /api/traces  (SDK or direct REST)
       ▼
-┌─────────────┐     ┌──────────────┐     ┌───────────────┐
-│  FastAPI    │────▶│  PostgreSQL  │     │  Qdrant       │
-│  Backend    │     │  (traces,    │     │  (vector      │
-│  :8000      │     │   evals,     │     │   embeddings  │
-└─────────────┘     │   projects)  │     │   for search) │
-      │             └──────────────┘     └───────────────┘
+┌──────────────────┐     ┌──────────────┐     ┌───────────────┐
+│  FastAPI Backend │────▶│  PostgreSQL  │     │  Qdrant       │
+│  :8000           │     │  (traces,    │     │  (vector      │
+│  trustbrain_     │     │   evals,     │     │   embeddings  │
+│  backend         │     │   projects)  │     │   for search) │
+└──────────────────┘     └──────────────┘     └───────────────┘
       │
       │  Redis (caching, rate limiting)
       │
-┌─────────────┐
-│  Streamlit  │  ◀──  User opens browser at :8501
-│  Frontend   │
-│  :8501      │
-└─────────────┘
+┌──────────────────┐
+│  Next.js 14      │  ◀──  User opens browser at :3010
+│  React Frontend  │
+│  trustbrain_     │
+│  frontend :3010  │
+└──────────────────┘
 ```
 
 ---
@@ -66,25 +68,36 @@ cd Exp_braintrust
 docker-compose up -d
 
 # 3. Open the dashboard
-open http://localhost:8501
+open http://localhost:3010
 
-# 4. Register and create a project, then grab your API key from Settings
+# 4. Register and create a project, then grab your API key from Settings → API Keys
 
-# 5. Send your first trace
-pip install httpx
+# 5. Send your first trace (replace YOUR_JWT_TOKEN with the token from login)
 python -c "
-import httpx
-httpx.post('http://localhost:8000/api/traces', json={
+import requests
+requests.post('http://localhost:8000/api/traces', json={
     'project_name': 'My Project',
     'model': 'gpt-4o',
     'input_data': {'prompt': 'Hello!'},
     'output_data': {'response': 'Hi there!'},
     'latency_ms': 320,
-    'total_tokens': 42
-}, headers={'X-API-Key': 'YOUR_API_KEY'})
+    'total_tokens': 42,
+    'cost_usd': 0.0006,
+}, headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'})
 print('Trace sent!')
 "
 ```
+
+### Live Ollama Demo
+
+Run the built-in demo to stream real traces from local Ollama models into the dashboard:
+
+```bash
+python examples/ollama_live_demo/live_demo.py
+# Then open http://localhost:3010/traces and hit Refresh
+```
+
+The demo runs 8 scenarios (code generation, reasoning, translation, multi-turn chat, etc.) against `gemma2:2b`, `mistral`, and `llama3:8b`. Cost is correctly shown as **$0.00**.
 
 For full installation details see [INSTALLATION.md](./INSTALLATION.md).  
 For SDK integration see [SDK_INTEGRATION.md](./SDK_INTEGRATION.md).

@@ -69,8 +69,8 @@ class Trace:
         return data
 
 
-class TraceIQClient:
-    """Main client for sending traces to TraceIQ backend."""
+class TrustBrainClient:
+    """Main client for sending traces to TrustBrain backend."""
     
     def __init__(
         self,
@@ -256,7 +256,7 @@ class TraceIQClient:
 
 
 # Global client instance (optional)
-_global_client: Optional[TraceIQClient] = None
+_global_client: Optional[TrustBrainClient] = None
 
 
 def init(api_key: str, base_url: str = "http://localhost:8000"):
@@ -268,7 +268,7 @@ def init(api_key: str, base_url: str = "http://localhost:8000"):
         trace_id = traciq.trace(...)
     """
     global _global_client
-    _global_client = TraceIQClient(api_key, base_url)
+    _global_client = TrustBrainClient(api_key, base_url)
 
 
 def trace(
