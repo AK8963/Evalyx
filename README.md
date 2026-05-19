@@ -99,6 +99,7 @@ TrustBrain/
 │   │   ├── evals.py
 │   │   ├── experiments.py
 │   │   ├── analytics.py
+│   │   ├── metrics.py          # Named scorer definitions + test runner
 │   │   ├── gateway.py
 │   │   ├── review.py
 │   │   ├── prompts.py
@@ -107,6 +108,7 @@ TrustBrain/
 │   └── search/                 # Semantic search + Qdrant
 ├── frontend-react/             # Next.js 14 dashboard (port 3010)
 │   ├── app/                    # App Router pages
+│   │   └── (dashboard)/        # Dashboard, Traces, Analytics, Metrics, ...
 │   ├── components/             # Shared UI components
 │   ├── lib/                    # API client, utils
 │   └── types/                  # TypeScript interfaces
@@ -117,15 +119,14 @@ TrustBrain/
 │       └── integrations/       # OpenAI, LangChain patches
 ├── database/                   # SQLAlchemy models + migrations
 ├── examples/
+│   ├── seed_demo_data.py        # Seeds realistic demo traces
+│   ├── seed_devtest.py          # Seeds dev/test data
 │   └── ollama_live_demo/       # Live Ollama tracing demo
 ├── docs/                       # Full documentation ← start here
 │   ├── screenshots/
 │   ├── INSTALLATION.md
 │   ├── PAGES_GUIDE.md
 │   └── SDK_INTEGRATION.md
-├── k8s/                        # Kubernetes manifests
-├── monitoring/                 # Prometheus + Grafana config
-├── tests/                      # Backend + SDK test suites
 ├── Dockerfile.backend
 ├── Dockerfile.frontend
 └── docker-compose.yml
@@ -140,6 +141,7 @@ TrustBrain/
 | **Tracing** | Single & batch ingestion, spans, tags, metadata, environment labels |
 | **Observability** | 8 KPI cards, 6+ charts, model comparison table, recent traces |
 | **Detail Panel** | Execution timeline (Gantt), token breakdown, collapsible sections |
+| **Metrics** | Named scorer library — built-in (Correctness, Relevance, Clarity) + custom LLM/autoeval/formula/code metrics |
 | **Evaluation** | LLM judge, exact match, JSON schema, code scorers |
 | **Experiments** | Regression detection vs baseline, severity classification |
 | **Gateway** | Unified LLM proxy with streaming (SSE) and caching |

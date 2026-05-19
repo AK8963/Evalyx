@@ -10,23 +10,31 @@ The frontend is a **Next.js 14** React application running at **http://localhost
 
 After logging in the left sidebar contains all pages. Use the project selector in the top bar to switch between projects.
 
+Active pages (visible in the sidebar):
+
 | Page | Path | Purpose |
 |---|---|---|
 | Dashboard | `/` | High-level health, cost, and charts for a project |
 | Traces | `/traces` | Browse and deep-inspect individual LLM calls |
 | Analytics | `/analytics` | Time-series charts for all key metrics |
-| Topics | `/topics` | Semantic clustering of traces by topic |
-| Deep Search | `/search` | Full-text and semantic search across traces |
 | Experiments | `/experiments` | Compare model versions; detect regressions |
 | Datasets | `/datasets` | Curated evaluation datasets |
+| **Metrics** | `/metrics` | Named scorer library — built-in + custom metric definitions |
 | Annotations | `/annotations` | Attach human labels to traces |
+| Playground | `/playground` | Interactive LLM prompt testing |
+| Settings | `/settings` | API keys and user preferences |
+
+Additional pages (implemented, not yet in sidebar):
+
+| Page | Path | Purpose |
+|---|---|---|
+| Topics | `/topics` | Semantic clustering of traces by topic |
+| Deep Search | `/search` | Full-text and semantic search across traces |
 | Review Queue | `/review` | Human review workflow for flagged traces |
 | Online Scoring | `/online-scoring` | Real-time scorer rules |
 | Prompts | `/prompts` | Version-controlled prompt templates |
-| Playground | `/playground` | Interactive LLM prompt testing |
 | Gateway | `/gateway` | Route LLM calls through TrustBrain |
 | A/B Tests | `/abtests` | Compare model variants head-to-head |
-| Settings | `/settings` | API keys and user preferences |
 
 ---
 
@@ -278,7 +286,54 @@ curl "http://localhost:8000/api/prompts?project_id=...&name=my-prompt" \
 
 ---
 
-## 📚 Datasets (`/datasets`)
+## � Metrics (`/metrics`)
+
+**Purpose:** Manage a reusable library of named scorer definitions. Metrics can be applied in Experiments and Evals to score LLM outputs consistently across projects.
+
+### Metric Types
+
+| Type | Icon | Description |
+|---|---|---|
+| `llm_judge` | LLM | Uses an LLM with a custom prompt template to rate output 0–1 |
+| `autoeval` | Auto | Rule-based checks: regex, exact match, contains, length, numeric diff |
+| `formula` | Fx | Python-safe math expression over `score`, `latency_ms`, `tokens` |
+| `code` | Code | Arbitrary Python snippet returning a float 0–1 |
+
+### Built-in Metrics (read-only)
+
+| Name | Type | What it evaluates |
+|---|---|---|
+| Correctness | LLM Judge | Factual accuracy of the answer (0 = wrong, 1 = fully accurate) |
+| Relevance | LLM Judge | How on-topic the answer is to the question |
+| Clarity | LLM Judge | Readability and structure of the response |
+
+### Creating a Custom Metric
+
+1. Click **New Metric** in the top-right.
+2. Choose a **Type** (LLM Judge, Autoeval, Formula, or Code).
+3. Fill in name, description, and type-specific config:
+   - **LLM Judge / Ollama** — write a prompt template using `{input}` and `{output}` placeholders; the model must return `SCORE: 0-1`.
+   - **Autoeval** — pick a rule (regex, exact match, contains, length, numeric diff) and configure its parameters.
+   - **Formula** — enter a safe math expression, e.g. `1 - latency_ms / 5000`.
+   - **Code** — write a Python snippet that receives `input`, `output`, and returns a float.
+4. Click **Save**.
+
+### Testing a Metric
+
+Every metric card has a **Test** button (beaker icon). Enter sample input and output text, then click **Run Test** — the metric executes immediately and returns the score + explanation.
+
+### Metric Prompt Template Placeholders
+
+| Placeholder | Replaced with |
+|---|---|
+| `{input}` | The trace input / user prompt |
+| `{output}` | The trace output / model response |
+
+The LLM response must contain `SCORE: <float>` to be parsed correctly.
+
+---
+
+## �📚 Datasets (`/datasets`)
 
 **Purpose:** Build curated golden datasets of (input, expected output) pairs for repeatable evaluation.
 
@@ -341,6 +396,10 @@ All endpoints are prefixed with `/api/`. No `/v1/` prefix.
 | `/api/review/stats` | GET | Review queue statistics |
 | `/api/search/keyword` | GET | Full-text keyword search across traces |
 | `/api/settings/api-keys` | GET / POST | List or store API keys |
+| `/api/metrics` | GET / POST | List or create metric definitions |
+| `/api/metrics/{id}` | GET / PUT / DELETE | Get, update, or delete a metric |
+| `/api/metrics/{id}/test` | POST | Test a metric against sample input/output |
+| `/api/metrics/builtins` | GET | List all built-in metrics |
 
 Full interactive documentation: **http://localhost:8000/docs**
 

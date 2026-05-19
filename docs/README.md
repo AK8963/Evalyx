@@ -10,6 +10,7 @@ TrustBrain is a self-hosted LLM observability platform. It captures every input/
 |---|---|
 | **Trace Ingestion** | Captures LLM inputs, outputs, latency, token counts, and cost from any application |
 | **Evaluations & Scoring** | Runs automated scorers (exact match, LLM-as-judge, JSON schema) against traces |
+| **Metrics Library** | Named scorer definitions — built-in (Correctness, Relevance, Clarity) + custom LLM/autoeval/formula/code metrics; test any metric live against sample input/output |
 | **Experiments** | Snapshots evaluation runs so you can compare model versions over time |
 | **Regression Detection** | Alerts when a new experiment scores worse than a baseline |
 | **Streaming Gateway** | Routes LLM calls through a unified gateway with real-time token streaming |
