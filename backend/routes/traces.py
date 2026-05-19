@@ -301,40 +301,33 @@ async def list_traces(
     environment: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
+    hours: Optional[int] = None,
+    days: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """List traces with filters."""
-    # Verify user has access to project
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.owner_id == current_user.id
     ).first()
-    
     if not project:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to project"
-        )
-    
-    # Build query
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to project")
+
     query = db.query(Trace).filter(Trace.project_id == project_id)
-    
+
     if model:
         query = query.filter(Trace.model == model)
-    
     if status_filter:
         query = query.filter(Trace.status == status_filter)
-
     if environment:
         query = query.filter(Trace.environment == environment)
-    
-    # Get total count
-    total = query.count()
-    
-    # Get paginated results, ordered by timestamp descending
+    if hours is not None:
+        query = query.filter(Trace.timestamp >= datetime.utcnow() - timedelta(hours=hours))
+    elif days is not None:
+        query = query.filter(Trace.timestamp >= datetime.utcnow() - timedelta(days=days))
+
     traces = query.order_by(desc(Trace.timestamp)).limit(limit).offset(offset).all()
-    
     return traces
 
 

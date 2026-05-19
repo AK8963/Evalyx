@@ -5,7 +5,10 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useProject } from '@/components/layout/ProjectSelector'
 import { formatMs, formatCost, formatDate, statusBadgeVariant } from '@/lib/utils'
-import { Search, RefreshCw, Copy, Check, Tag, Zap, DollarSign, Clock, Hash, ChevronDown, ChevronRight } from 'lucide-react'
+import {
+  Search, RefreshCw, Copy, Check, Tag, Zap, DollarSign, Clock, Hash,
+  ChevronDown, ChevronRight, ArrowDown,
+} from 'lucide-react'
 import type { Trace } from '@/types'
 
 function Badge({ variant, children }: { variant: string; children: React.ReactNode }) {
@@ -51,104 +54,202 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
   )
 }
 
-/** Visual waterfall timeline of the trace execution phases */
-function ExecutionTimeline({ trace }: { trace: Trace }) {
+function Arrow() {
+  return (
+    <div className="flex justify-center my-0.5">
+      <div className="flex flex-col items-center">
+        <div className="w-0.5 h-3 bg-border" />
+        <ArrowDown className="h-3 w-3 text-muted-foreground -mt-0.5" />
+      </div>
+    </div>
+  )
+}
+
+/** Extracts a human-readable snippet from input/output JSON */
+function extractSnippet(data: Record<string, unknown> | null | undefined, maxLen = 80): string {
+  if (!data) return ''
+  const val = data.question ?? data.prompt ?? data.text ?? data.input
+    ?? data.response ?? data.answer ?? data.content ?? data.output
+  if (typeof val === 'string') return val.slice(0, maxLen) + (val.length > maxLen ? '…' : '')
+  const msgs = data.messages
+  if (Array.isArray(msgs) && msgs.length > 0) {
+    const last = msgs[msgs.length - 1] as Record<string, unknown>
+    const c = last?.content
+    if (typeof c === 'string') return c.slice(0, maxLen) + (c.length > maxLen ? '…' : '')
+  }
+  return ''
+}
+
+/** Vertical flowchart of the LLM pipeline */
+function ExecutionFlowchart({ trace }: { trace: Trace }) {
   const total = trace.latency_ms ?? 1
   const prompt = trace.prompt_tokens ?? 0
   const completion = trace.completion_tokens ?? 0
+  const reasoning = trace.reasoning_tokens ?? 0
   const totalTok = prompt + completion || 1
 
-  // Derive phase durations proportionally
-  const queueMs   = Math.round(total * 0.04)
-  const evalMs    = prompt   > 0 ? Math.round(total * (prompt   / totalTok) * 0.55) : Math.round(total * 0.30)
-  const genMs     = completion > 0 ? Math.round(total * (completion / totalTok) * 0.55) : Math.round(total * 0.55)
-  const postMs    = total - queueMs - evalMs - genMs
+  const queueMs  = Math.round(total * 0.04)
+  const evalMs   = prompt      > 0 ? Math.round(total * (prompt      / totalTok) * 0.55) : Math.round(total * 0.28)
+  const genMs    = completion  > 0 ? Math.round(total * (completion  / totalTok) * 0.55) : Math.round(total * 0.54)
+  const postMs   = Math.max(0, total - queueMs - evalMs - genMs)
+
+  const inputSnippet  = extractSnippet(trace.input_data)
+  const outputSnippet = extractSnippet(trace.output_data)
 
   const phases = [
-    { label: 'Queue', ms: queueMs,  color: 'bg-blue-400',    start: 0 },
-    { label: 'Prompt Eval', ms: evalMs,   color: 'bg-violet-500', start: queueMs },
-    { label: 'Generation',  ms: genMs,    color: 'bg-emerald-500',start: queueMs + evalMs },
-    { label: 'Post-process',ms: postMs,   color: 'bg-amber-400',  start: queueMs + evalMs + genMs },
+    {
+      label: 'Queue',
+      icon: '⏳',
+      ms: queueMs,
+      color: 'border-blue-300 bg-blue-50',
+      dot: 'bg-blue-400',
+      detail: 'Request queued for processing',
+    },
+    {
+      label: 'Prompt Eval',
+      icon: '🔍',
+      ms: evalMs,
+      color: 'border-violet-300 bg-violet-50',
+      dot: 'bg-violet-500',
+      detail: prompt > 0 ? `${prompt.toLocaleString()} prompt tokens tokenised` : 'Prompt evaluation',
+    },
+    {
+      label: 'Generation',
+      icon: '⚡',
+      ms: genMs,
+      color: 'border-emerald-300 bg-emerald-50',
+      dot: 'bg-emerald-500',
+      detail: completion > 0
+        ? `${completion.toLocaleString()} tokens generated${reasoning > 0 ? ` (+${reasoning} reasoning)` : ''}`
+        : 'Model generating response',
+    },
+    {
+      label: 'Post-process',
+      icon: '🔧',
+      ms: postMs,
+      color: 'border-amber-300 bg-amber-50',
+      dot: 'bg-amber-400',
+      detail: 'Parsing, scoring, routing',
+    },
   ]
 
   return (
-    <div className="space-y-3">
-      {/* Gantt bar */}
-      <div className="relative h-6 rounded overflow-hidden bg-muted flex">
-        {phases.map((p) => (
-          <div
-            key={p.label}
-            title={`${p.label}: ${formatMs(p.ms)}`}
-            className={`${p.color} h-full transition-all`}
-            style={{ width: `${(p.ms / total) * 100}%` }}
-          />
-        ))}
+    <div className="space-y-0">
+      {/* INPUT node */}
+      <div className="rounded-lg border border-primary/40 bg-primary/5 px-3 py-2.5">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-base">📥</span>
+          <span className="text-xs font-semibold text-primary">INPUT</span>
+          {prompt > 0 && (
+            <span className="ml-auto text-[10px] text-muted-foreground font-mono">{prompt.toLocaleString()} tokens</span>
+          )}
+        </div>
+        {inputSnippet && (
+          <p className="text-[11px] text-muted-foreground leading-snug font-mono truncate">{inputSnippet}</p>
+        )}
       </div>
 
-      {/* Legend rows */}
-      {phases.map((p, i) => {
-        const startPct = (p.start / total) * 100
-        const widthPct = (p.ms / total) * 100
-        return (
-          <div key={p.label} className="flex items-center gap-2 text-xs">
-            <span className={`inline-block h-2.5 w-2.5 rounded-sm shrink-0 ${p.color}`} />
-            <span className="w-24 text-muted-foreground">{p.label}</span>
-            <div className="flex-1 relative h-4 bg-muted/40 rounded overflow-hidden">
-              <div
-                className={`absolute top-0 h-full rounded ${p.color} opacity-80`}
-                style={{ left: `${startPct}%`, width: `${widthPct}%` }}
-              />
+      {/* Pipeline phases */}
+      {phases.map((p) => (
+        <div key={p.label}>
+          <Arrow />
+          <div className={`rounded-lg border ${p.color} px-3 py-2.5`}>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">{p.icon}</span>
+              <span className="text-xs font-semibold">{p.label}</span>
+              <div className="flex-1 mx-2 h-2 rounded-full bg-black/5 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${p.dot}`}
+                  style={{ width: `${Math.round((p.ms / total) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[11px] font-mono font-semibold shrink-0">{formatMs(p.ms)}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">
+                {Math.round((p.ms / total) * 100)}%
+              </span>
             </div>
-            <span className="w-14 text-right font-mono">{formatMs(p.ms)}</span>
+            <p className="text-[11px] text-muted-foreground mt-1 ml-6">{p.detail}</p>
           </div>
-        )
-      })}
+        </div>
+      ))}
 
-      {/* Total row */}
-      <div className="flex items-center justify-between text-xs border-t pt-2 mt-1">
-        <span className="text-muted-foreground">Total end-to-end</span>
-        <span className="font-semibold font-mono">{formatMs(total)}</span>
+      <Arrow />
+
+      {/* OUTPUT node */}
+      <div className={`rounded-lg border px-3 py-2.5 ${
+        trace.status === 'error'
+          ? 'border-red-300 bg-red-50'
+          : 'border-emerald-400/60 bg-emerald-50/60'
+      }`}>
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-base">{trace.status === 'error' ? '❌' : '📤'}</span>
+          <span className={`text-xs font-semibold ${trace.status === 'error' ? 'text-red-600' : 'text-emerald-700'}`}>
+            {trace.status === 'error' ? 'ERROR' : 'OUTPUT'}
+          </span>
+          {completion > 0 && (
+            <span className="ml-auto text-[10px] text-muted-foreground font-mono">{completion.toLocaleString()} tokens</span>
+          )}
+        </div>
+        {trace.status === 'error' && trace.error_message ? (
+          <p className="text-[11px] text-red-600 leading-snug font-mono truncate">{trace.error_message}</p>
+        ) : outputSnippet ? (
+          <p className="text-[11px] text-muted-foreground leading-snug font-mono truncate">{outputSnippet}</p>
+        ) : null}
+      </div>
+
+      {/* Totals summary */}
+      <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
+        <div className="text-muted-foreground">Total latency</div>
+        <div className="col-span-2 font-semibold font-mono">{formatMs(total)}</div>
+        {(prompt + completion) > 0 && (
+          <>
+            <div className="text-muted-foreground">Total tokens</div>
+            <div className="col-span-2 font-semibold">{(prompt + completion).toLocaleString()}</div>
+          </>
+        )}
+        {trace.cost_usd != null && (
+          <>
+            <div className="text-muted-foreground">Cost</div>
+            <div className="col-span-2 font-semibold">{formatCost(trace.cost_usd)}</div>
+          </>
+        )}
       </div>
     </div>
   )
 }
 
-/** Token breakdown bar */
-function TokenBreakdown({ prompt, completion }: { prompt?: number; completion?: number }) {
-  const p = prompt ?? 0
-  const c = completion ?? 0
-  const tot = p + c
-  if (tot === 0) return <p className="text-xs text-muted-foreground">No token data</p>
-
-  const pPct = (p / tot) * 100
-  const cPct = (c / tot) * 100
-
+function KVRow({ label, value }: { label: string; value: React.ReactNode }) {
+  if (value === null || value === undefined || value === '' || value === '—') return null
   return (
-    <div className="space-y-2">
-      <div className="flex h-5 rounded overflow-hidden text-[10px] font-medium">
-        <div className="bg-violet-500 flex items-center justify-center text-white" style={{ width: `${pPct}%` }}>
-          {p > 0 && pPct > 12 ? `${p}` : ''}
-        </div>
-        <div className="bg-emerald-500 flex items-center justify-center text-white" style={{ width: `${cPct}%` }}>
-          {c > 0 && cPct > 12 ? `${c}` : ''}
-        </div>
-      </div>
-      <div className="flex gap-4 text-xs">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-violet-500 inline-block" />Prompt <strong>{p.toLocaleString()}</strong></span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-emerald-500 inline-block" />Completion <strong>{c.toLocaleString()}</strong></span>
-        <span className="flex items-center gap-1.5 ml-auto text-muted-foreground">Total <strong>{tot.toLocaleString()}</strong></span>
-      </div>
+    <div className="flex gap-2 text-xs py-1 border-b last:border-0">
+      <span className="text-muted-foreground w-32 shrink-0">{label}</span>
+      <span className="font-mono font-medium break-all">{value}</span>
     </div>
   )
 }
 
-function TraceDetail({ trace }: { trace: Trace }) {
-  const tags: string[] = trace.tags ?? (trace.metadata as Record<string, unknown> & { tags?: string[] })?.tags ?? []
+function TraceDetail({ traceId }: { traceId: string }) {
+  const { data: trace, isLoading } = useQuery({
+    queryKey: ['trace-detail', traceId],
+    queryFn: () => api.traces.get(traceId),
+    staleTime: 30_000,
+  })
+
+  if (isLoading || !trace) {
+    return (
+      <div className="rounded-xl border bg-card flex items-center justify-center h-full">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    )
+  }
+
+  const tags: string[] = trace.tags ?? []
+  const spans = trace.spans ?? []
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden flex flex-col h-full">
       {/* Header */}
-      <div className={`px-4 py-3 border-b flex items-center justify-between ${
+      <div className={`px-4 py-3 border-b flex items-center justify-between shrink-0 ${
         trace.status === 'success' ? 'bg-green-500/10 border-green-500/20' :
         trace.status === 'error'   ? 'bg-red-500/10 border-red-500/20' : 'bg-muted/40'
       }`}>
@@ -160,7 +261,9 @@ function TraceDetail({ trace }: { trace: Trace }) {
           <div className="flex items-center gap-2 mt-0.5">
             <p className="font-semibold text-sm truncate">{trace.model ?? 'Unknown model'}</p>
             {trace.environment && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase font-medium">{trace.environment}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase font-medium">
+                {trace.environment}
+              </span>
             )}
           </div>
         </div>
@@ -168,7 +271,7 @@ function TraceDetail({ trace }: { trace: Trace }) {
       </div>
 
       {/* KPI bar */}
-      <div className="grid grid-cols-4 divide-x border-b bg-muted/20">
+      <div className="grid grid-cols-4 divide-x border-b bg-muted/20 shrink-0">
         {[
           { icon: Clock,      label: 'Latency', value: formatMs(trace.latency_ms) },
           { icon: Hash,       label: 'Tokens',  value: trace.total_tokens?.toLocaleString() ?? '—' },
@@ -188,27 +291,122 @@ function TraceDetail({ trace }: { trace: Trace }) {
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
 
-        {/* Error banner */}
-        {trace.error_message && (
-          <div className="bg-destructive/10 text-destructive rounded-lg p-3 text-xs border border-destructive/20">
-            <p className="font-medium mb-1">Error</p>
-            {trace.error_message}
-          </div>
-        )}
-
-        {/* Execution Timeline */}
-        <Section title="⚡ Execution Timeline">
-          <ExecutionTimeline trace={trace} />
+        {/* ── Execution flowchart ── */}
+        <Section title="⚡ Execution Flow">
+          <ExecutionFlowchart trace={trace} />
         </Section>
 
-        {/* Token breakdown */}
-        {(trace.prompt_tokens || trace.completion_tokens) && (
-          <Section title="🔢 Token Breakdown">
-            <TokenBreakdown prompt={trace.prompt_tokens} completion={trace.completion_tokens} />
+        {/* ── All parameters ── */}
+        <Section title="📋 All Parameters">
+          <div className="divide-y">
+            <KVRow label="Trace ID"           value={<span className="flex items-center gap-1">{trace.id}<CopyButton text={trace.id} /></span>} />
+            <KVRow label="Project ID"         value={trace.project_id} />
+            <KVRow label="Model"              value={trace.model ?? '—'} />
+            <KVRow label="Status"             value={<Badge variant={statusBadgeVariant(trace.status)}>{trace.status}</Badge>} />
+            <KVRow label="Environment"        value={trace.environment ?? '—'} />
+            <KVRow label="Latency"            value={formatMs(trace.latency_ms)} />
+            <KVRow label="Total Tokens"       value={trace.total_tokens?.toLocaleString() ?? '—'} />
+            <KVRow label="Prompt Tokens"      value={trace.prompt_tokens?.toLocaleString() ?? '—'} />
+            <KVRow label="Completion Tokens"  value={trace.completion_tokens?.toLocaleString() ?? '—'} />
+            <KVRow label="Reasoning Tokens"   value={trace.reasoning_tokens?.toLocaleString() ?? '—'} />
+            <KVRow label="Cost"               value={formatCost(trace.cost_usd)} />
+            <KVRow label="Temperature"        value={trace.temperature != null ? String(trace.temperature) : '—'} />
+            <KVRow label="Max Tokens"         value={trace.max_tokens?.toLocaleString() ?? '—'} />
+            <KVRow label="Tags"               value={tags.length > 0 ? tags.join(', ') : '—'} />
+            <KVRow label="Timestamp"          value={formatDate(trace.timestamp ?? trace.created_at)} />
+            <KVRow label="Created At"         value={formatDate(trace.created_at)} />
+            <KVRow label="Spans"              value={spans.length > 0 ? `${spans.length} span${spans.length > 1 ? 's' : ''}` : '—'} />
+          </div>
+        </Section>
+
+        {/* ── Input ── */}
+        {trace.input_data && (
+          <Section title="📥 Input">
+            <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-52 whitespace-pre-wrap leading-relaxed">
+              {typeof trace.input_data?.prompt === 'string'
+                ? trace.input_data.prompt
+                : JSON.stringify(trace.input_data, null, 2)}
+            </pre>
           </Section>
         )}
 
-        {/* Tags */}
+        {/* ── Output ── */}
+        {trace.output_data && (
+          <Section title="📤 Output">
+            <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-52 whitespace-pre-wrap leading-relaxed">
+              {typeof trace.output_data?.response === 'string'
+                ? trace.output_data.response
+                : JSON.stringify(trace.output_data, null, 2)}
+            </pre>
+          </Section>
+        )}
+
+        {/* ── Expected Output ── */}
+        {trace.expected_output && (
+          <Section title="🎯 Expected Output" defaultOpen={false}>
+            <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-40 whitespace-pre-wrap leading-relaxed">
+              {JSON.stringify(trace.expected_output, null, 2)}
+            </pre>
+          </Section>
+        )}
+
+        {/* ── Scores ── */}
+        {trace.scores && trace.scores.length > 0 && (
+          <Section title="🏅 Scores">
+            <div className="space-y-2.5">
+              {trace.scores.map((s) => {
+                const pct = Math.round(s.score * 100)
+                const color = pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-400' : 'bg-red-500'
+                return (
+                  <div key={s.id} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{s.scorer_type}</span>
+                      <span className="font-semibold font-mono">{pct}%</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    {!!(s as unknown as Record<string, unknown>).reasoning && (
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        {String((s as unknown as Record<string, unknown>).reasoning)}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Spans ── */}
+        {spans.length > 0 && (
+          <Section title="🔗 Spans" defaultOpen={false}>
+            <div className="space-y-2">
+              {spans.map((sp, i) => (
+                <div key={i} className="rounded-lg border bg-muted/20 px-3 py-2 text-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold">{sp.name ?? `Span ${i + 1}`}</span>
+                    <div className="flex items-center gap-2">
+                      {sp.duration_ms != null && (
+                        <span className="font-mono text-muted-foreground">{formatMs(sp.duration_ms)}</span>
+                      )}
+                      {sp.status && (
+                        <Badge variant={statusBadgeVariant(sp.status)}>{sp.status}</Badge>
+                      )}
+                    </div>
+                  </div>
+                  {sp.attributes && Object.keys(sp.attributes).length > 0 && (
+                    <pre className="text-[10px] bg-muted rounded p-1.5 overflow-auto max-h-24 whitespace-pre-wrap">
+                      {JSON.stringify(sp.attributes, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Tags ── */}
         {tags.length > 0 && (
           <Section title="🏷️ Tags">
             <div className="flex flex-wrap gap-1.5">
@@ -221,49 +419,19 @@ function TraceDetail({ trace }: { trace: Trace }) {
           </Section>
         )}
 
-        {/* Input */}
-        {trace.input_data && (
-          <Section title="📥 Input">
-            <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap leading-relaxed">
-              {typeof trace.input_data?.prompt === 'string'
-                ? trace.input_data.prompt
-                : JSON.stringify(trace.input_data, null, 2)}
-            </pre>
+        {/* ── Error ── */}
+        {trace.error_message && (
+          <Section title="❌ Error">
+            <p className="text-xs text-destructive leading-relaxed font-mono whitespace-pre-wrap">
+              {trace.error_message}
+            </p>
           </Section>
         )}
 
-        {/* Output */}
-        {trace.output_data && (
-          <Section title="📤 Output">
-            <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap leading-relaxed">
-              {typeof trace.output_data?.response === 'string'
-                ? trace.output_data.response
-                : JSON.stringify(trace.output_data, null, 2)}
-            </pre>
-          </Section>
-        )}
-
-        {/* Scores */}
-        {trace.scores && trace.scores.length > 0 && (
-          <Section title="🎯 Scores">
-            <div className="space-y-2">
-              {trace.scores.map((s) => (
-                <div key={s.id} className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-28 truncate">{s.scorer_type}</span>
-                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: `${s.score * 100}%` }} />
-                  </div>
-                  <span className="text-xs font-mono w-10 text-right">{(s.score * 100).toFixed(0)}%</span>
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Metadata */}
+        {/* ── Metadata ── */}
         {trace.metadata && Object.keys(trace.metadata).filter(k => k !== 'tags').length > 0 && (
           <Section title="🗂️ Metadata" defaultOpen={false}>
-            <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-32 whitespace-pre-wrap">
+            <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-40 whitespace-pre-wrap">
               {JSON.stringify(
                 Object.fromEntries(Object.entries(trace.metadata).filter(([k]) => k !== 'tags')),
                 null, 2,
@@ -276,16 +444,28 @@ function TraceDetail({ trace }: { trace: Trace }) {
   )
 }
 
+
+const TIME_FILTERS = [
+  { label: '1h',  hours: 1 },
+  { label: '3h',  hours: 3 },
+  { label: '1d',  days:  1 },
+  { label: '3d',  days:  3 },
+  { label: '7d',  days:  7 },
+  { label: 'All', hours: undefined, days: undefined },
+] as const
+type TimeFilter = (typeof TIME_FILTERS)[number]
+
 export default function TracesPage() {
   const { project } = useProject()
   const [selected, setSelected] = useState<Trace | null>(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [modelFilter, setModelFilter] = useState('')
   const [page, setPage] = useState(0)
+  const [activeFilter, setActiveFilter] = useState<TimeFilter>(TIME_FILTERS[2])
   const PAGE_SIZE = 25
 
   const { data: traces = [], isFetching, refetch } = useQuery({
-    queryKey: ['traces', project?.id, statusFilter, modelFilter, page],
+    queryKey: ['traces', project?.id, statusFilter, modelFilter, page, activeFilter.label],
     queryFn: () =>
       api.traces.list({
         project_id: project!.id,
@@ -293,6 +473,8 @@ export default function TracesPage() {
         model: modelFilter || undefined,
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
+        hours: ('hours' in activeFilter && activeFilter.hours != null) ? activeFilter.hours : undefined,
+        days:  ('days'  in activeFilter && (activeFilter as {days?: number}).days  != null) ? (activeFilter as {days?: number}).days  : undefined,
       }),
     enabled: !!project,
   })
@@ -316,6 +498,23 @@ export default function TracesPage() {
           <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
         </button>
+      </div>
+
+      {/* Time filter pills */}
+      <div className="flex gap-1.5 flex-wrap">
+        {TIME_FILTERS.map((f) => (
+          <button
+            key={f.label}
+            onClick={() => { setActiveFilter(f); setPage(0) }}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              activeFilter.label === f.label
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/70'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {/* Filters */}
@@ -415,7 +614,7 @@ export default function TracesPage() {
         {/* Detail panel */}
         {selected && (
           <div className="w-[460px] shrink-0 overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-            <TraceDetail trace={selected} />
+            <TraceDetail traceId={selected.id} />
           </div>
         )}
       </div>

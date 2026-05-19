@@ -234,7 +234,12 @@ class Dataset(Base):
     # Dataset examples (stored as JSON array)
     # Each example: {"input": ..., "expected_output": ..., "metadata": ...}
     examples = Column(JSON, default=[])
-    
+
+    # Custom column schema: list of {key, label, built_in} dicts
+    # built_in keys: 'input_data', 'expected_output' (renameable, not deletable)
+    # custom keys: stored in DatasetItem.extra_metadata
+    column_schema = Column(JSON, nullable=True, default=list)
+
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -286,6 +291,25 @@ class Eval(Base):
 
     def __repr__(self):
         return f"<Eval {self.name}>"
+
+
+class Metric(Base):
+    """Metric model — named scorer definition (built-in or custom)."""
+    __tablename__ = "metrics"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=True, index=True)  # NULL = global built-in
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    metric_type = Column(String(50), default="llm_judge")  # llm_judge, autoeval, formula, code
+    prompt_template = Column(Text, nullable=True)
+    config = Column(JSON, nullable=True)          # type-specific config blob
+    is_builtin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Metric {self.name}>"
 
 
 # ---------------------------------------------------------------------------

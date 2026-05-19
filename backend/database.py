@@ -33,4 +33,17 @@ def get_db():
 def init_db():
     """Initialize database - create all tables."""
     from database.models import Base
+    from sqlalchemy import text
     Base.metadata.create_all(bind=engine)
+    # Idempotent migration: add column_schema to datasets if not present
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(
+                "ALTER TABLE datasets ADD COLUMN IF NOT EXISTS column_schema JSON DEFAULT '[]'"
+            ))
+            conn.execute(text(
+                "ALTER TABLE metrics ADD COLUMN IF NOT EXISTS config JSON"
+            ))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists or non-PostgreSQL DB

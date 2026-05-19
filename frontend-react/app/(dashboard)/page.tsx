@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useProject } from '@/components/layout/ProjectSelector'
@@ -116,44 +117,62 @@ function toDateLabel(date: string) {
   return new Date(date + 'T00:00:00Z').toLocaleDateString('en', { month: 'short', day: 'numeric' })
 }
 
+const TIME_FILTERS = [
+  { label: '1hr',  hours: 1 },
+  { label: '3hr',  hours: 3 },
+  { label: '1d',   days: 1 },
+  { label: '3d',   days: 3 },
+  { label: '7d',   days: 7 },
+  { label: 'All', hours: undefined, days: undefined },
+] as const
+
+type TF = typeof TIME_FILTERS[number]
+
+function getApiParams(tf: TF): { days?: number; hours?: number } {
+  if ('hours' in tf) return { hours: tf.hours }
+  return { days: tf.days }
+}
+
 export default function DashboardPage() {
   const { project } = useProject()
+  const [activeFilter, setActiveFilter] = useState<TF>(TIME_FILTERS[4])
+  const apiParams = getApiParams(activeFilter)
 
   const { data: summary } = useQuery({
-    queryKey: ['analytics-summary', project?.id],
-    queryFn: () => api.analytics.summary(project!.id, 7),
+    queryKey: ['analytics-summary', project?.id, activeFilter.label],
+    queryFn: () => api.analytics.summary(project!.id, apiParams.days ?? 7, apiParams.hours),
     enabled: !!project,
   })
 
   const { data: latencyTs } = useQuery({
-    queryKey: ['ts-avg_latency', project?.id],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'avg_latency', 7),
+    queryKey: ['ts-avg_latency', project?.id, activeFilter.label],
+    queryFn: () => api.analytics.timeSeries(project!.id, 'avg_latency', apiParams.days ?? 7, apiParams.hours),
     enabled: !!project,
   })
   const { data: countTs } = useQuery({
-    queryKey: ['ts-trace_count', project?.id],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'trace_count', 7),
+    queryKey: ['ts-trace_count', project?.id, activeFilter.label],
+    queryFn: () => api.analytics.timeSeries(project!.id, 'trace_count', apiParams.days ?? 7, apiParams.hours),
     enabled: !!project,
   })
   const { data: costTs } = useQuery({
-    queryKey: ['ts-total_cost', project?.id],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'total_cost', 7),
+    queryKey: ['ts-total_cost', project?.id, activeFilter.label],
+    queryFn: () => api.analytics.timeSeries(project!.id, 'total_cost', apiParams.days ?? 7, apiParams.hours),
     enabled: !!project,
   })
   const { data: tokenTs } = useQuery({
-    queryKey: ['ts-total_tokens', project?.id],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'total_tokens', 7),
+    queryKey: ['ts-total_tokens', project?.id, activeFilter.label],
+    queryFn: () => api.analytics.timeSeries(project!.id, 'total_tokens', apiParams.days ?? 7, apiParams.hours),
     enabled: !!project,
   })
   const { data: errorTs } = useQuery({
-    queryKey: ['ts-error_count', project?.id],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'error_count', 7),
+    queryKey: ['ts-error_count', project?.id, activeFilter.label],
+    queryFn: () => api.analytics.timeSeries(project!.id, 'error_count', apiParams.days ?? 7, apiParams.hours),
     enabled: !!project,
   })
 
   const { data: modelStats = [] } = useQuery({
-    queryKey: ['analytics-models', project?.id],
-    queryFn: () => api.analytics.models(project!.id, 7),
+    queryKey: ['analytics-models', project?.id, activeFilter.label],
+    queryFn: () => api.analytics.models(project!.id, apiParams.days ?? 7, apiParams.hours),
     enabled: !!project,
   })
 
@@ -171,6 +190,19 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  const filterPills = (
+    <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+      {TIME_FILTERS.map((tf) => (
+        <button key={tf.label} onClick={() => setActiveFilter(tf)}
+          className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+            activeFilter.label === tf.label
+              ? 'bg-background shadow text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}>{tf.label}</button>
+      ))}
+    </div>
+  )
 
   const errorCount = summary?.error_traces ?? summary?.error_count ?? 0
   const successRate = summary
@@ -198,7 +230,7 @@ export default function DashboardPage() {
 
   // Model performance bar data
   const modelBarData = modelStats.map((m) => ({
-    model: m.model.length > 12 ? m.model.slice(0, 12) + '…' : m.model,
+    model: m.model.length > 12 ? m.model.slice(0, 12) + 'ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦' : m.model,
     'Avg Latency (ms)': Math.round(m.avg_latency_ms ?? 0),
     'Error %': +(m.error_rate * 100).toFixed(1),
     'Cost/trace ($)': +(m.avg_cost_usd ?? 0).toFixed(4),
@@ -210,12 +242,15 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold">{project.name}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Last 7 days overview</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">{project.name}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Overview · {activeFilter.label}</p>
+        </div>
+        {filterPills}
       </div>
 
-      {/* ── Row 1: KPI Cards ─────────────────────────────────────────── */}
+      {/* Row 1: KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard label="Total Traces"  value={(summary?.total_traces ?? 0).toLocaleString()} icon={Activity} />
         <StatCard label="Success Rate"  value={`${successRate.toFixed(1)}%`} icon={CheckCircle2} sub={`${errorCount} errors`} />
@@ -226,10 +261,10 @@ export default function DashboardPage() {
         <StatCard label="Total Tokens"  value={(summary?.total_tokens ?? 0).toLocaleString()} icon={Zap} />
         <StatCard label="Error Count"   value={errorCount.toLocaleString()} icon={AlertTriangle} sub={`${(summary?.error_rate ?? 0 * 100).toFixed(1)}% error rate`} />
         <StatCard label="Models Active" value={modelStats.length} icon={BarChart2} sub="last 7 days" />
-        <StatCard label="Cost / Trace"  value={summary?.total_traces ? formatCost((summary.total_cost_usd ?? 0) / summary.total_traces) : '—'} icon={TrendingUp} sub="average" />
+        <StatCard label="Cost / Trace"  value={summary?.total_traces ? formatCost((summary.total_cost_usd ?? 0) / summary.total_traces) : 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'} icon={TrendingUp} sub="average" />
       </div>
 
-      {/* ── Row 2: Trace Volume + Error trend (combined) ─────────────── */}
+      {/* Row 2: Trace Volume + Error trend (combined) */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <ChartCard title="Daily Trace Volume" subtitle="Success vs errors per day">
           {combinedTs.length > 0 ? (
@@ -264,7 +299,7 @@ export default function DashboardPage() {
         </ChartCard>
       </div>
 
-      {/* ── Row 3: Cost trend + Token usage ──────────────────────────── */}
+      {/* Row 3: Cost trend + Token usage */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <ChartCard title="Daily Cost (USD)" subtitle="Spend trend over 7 days">
           {tsCost.length > 0 ? (
@@ -297,7 +332,7 @@ export default function DashboardPage() {
         </ChartCard>
       </div>
 
-      {/* ── Row 4: Model distribution + Avg latency per model ────────── */}
+      {/* Row 4: Model distribution + Avg latency per model */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <ChartCard title="Traces by Model" subtitle="Distribution across models">
           {pieData.length > 0 ? (
@@ -330,7 +365,7 @@ export default function DashboardPage() {
         </ChartCard>
       </div>
 
-      {/* ── Row 5: Model performance table ───────────────────────────── */}
+      {/* Row 5: Model performance table */}
       {modelStats.length > 0 && (
         <div className="rounded-xl border bg-card">
           <div className="px-5 py-4 border-b flex items-center gap-2">
@@ -371,7 +406,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Row 6: Error count sparkline ─────────────────────────────── */}
+      {/* Row 6: Error count sparkline */}
       {tsErrors.some(e => e.value > 0) && (
         <ChartCard title="Error Count Over Time" subtitle="Daily failures">
           <ResponsiveContainer width="100%" height={140}>
@@ -387,7 +422,7 @@ export default function DashboardPage() {
         </ChartCard>
       )}
 
-      {/* ── Row 7: Recent Traces ──────────────────────────────────────── */}
+      {/* Row 7: Recent Traces */}
       <div className="rounded-xl border bg-card">
         <div className="px-5 py-4 border-b">
           <h2 className="text-sm font-semibold">Recent Traces</h2>
@@ -411,13 +446,13 @@ export default function DashboardPage() {
               ) : (
                 traces.map((t) => (
                   <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-2.5 font-mono text-xs">{t.id.slice(0, 8)}…</td>
-                    <td className="px-4 py-2.5 max-w-[130px] truncate">{t.model ?? '—'}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs">{t.id.slice(0, 8)}...</td>
+                    <td className="px-4 py-2.5 max-w-[130px] truncate">{t.model ?? '--'}</td>
                     <td className="px-4 py-2.5">
                       <Badge variant={statusBadgeVariant(t.status)}>{t.status}</Badge>
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">{formatMs(t.latency_ms)}</td>
-                    <td className="px-4 py-2.5">{t.total_tokens?.toLocaleString() ?? '—'}</td>
+                    <td className="px-4 py-2.5">{t.total_tokens?.toLocaleString() ?? '--'}</td>
                     <td className="px-4 py-2.5 whitespace-nowrap">{formatCost(t.cost_usd)}</td>
                     <td className="px-4 py-2.5 text-muted-foreground text-xs whitespace-nowrap">
                       {formatDate(t.timestamp ?? t.created_at)}

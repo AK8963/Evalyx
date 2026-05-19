@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(() => {
-    localStorage.removeItem('traciq_token')
+    localStorage.removeItem('trustbrain_token')
     setToken(null)
     setUser(null)
     window.location.href = '/login'

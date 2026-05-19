@@ -57,6 +57,36 @@ async def startup_event():
     init_db()
     logger.info("Database initialized successfully")
 
+    # Re-queue any evals that were left pending/running (e.g. after a hot-reload)
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from backend.database import SessionLocal
+    from database.models import Eval
+    from backend.scoring import run_eval_task
+
+    def _resume_pending():
+        db = SessionLocal()
+        try:
+            pending = db.query(Eval).filter(Eval.status.in_(["pending", "running"])).all()
+            for ev in pending:
+                logger.info(f"Resuming pending eval {ev.id} ({ev.name})")
+                try:
+                    run_eval_task(
+                        eval_id=ev.id,
+                        project_id=ev.project_id,
+                        dataset_id=ev.dataset_id,
+                        scorers=ev.scorers or [],
+                    )
+                except Exception as exc:
+                    logger.error(f"Failed to resume eval {ev.id}: {exc}")
+        finally:
+            db.close()
+
+    if True:  # always check on startup
+        executor = ThreadPoolExecutor(max_workers=1)
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(executor, _resume_pending)
+
 
 # Health check endpoint
 @app.get("/health", tags=["health"])
@@ -110,7 +140,7 @@ from backend.routes import (
     online_scoring, organizations, audit, dashboards,
     environments, webhooks, export, abtests, autoevals,
     pricing, acls, btql, remote_evals,
-    sso, alerts, masking,
+    sso, alerts, masking, metrics,
 )
 from backend.routes import review
 
@@ -127,6 +157,7 @@ app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(topics.router, prefix="/api/topics", tags=["topics"])
 app.include_router(loop.router, prefix="/api/loop", tags=["loop"])
 app.include_router(dashboards.router, prefix="/api/dashboards", tags=["dashboards"])
+app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
 
 # ── Phase 3: Datasets & Annotations ─────────────────────────────────────────
 app.include_router(datasets.router, prefix="/api/datasets", tags=["datasets"])

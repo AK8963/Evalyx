@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.routes.auth import get_current_user
-from database.models import APIKeySetting, GatewayRequest, User
+from database.models import APIKeySetting, GatewayRequest, User, Trace
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -197,11 +197,21 @@ def _call_provider(
     if provider == "ollama":
         import httpx
         from backend.config import settings as cfg
+        # Strip the "ollama-" prefix and resolve short aliases to full tag names
+        raw = model.replace("ollama-", "") if model.startswith("ollama-") else model
+        _OLLAMA_ALIASES = {
+            "llama3": "llama3:8b",
+            "llama2": "llama2:latest",
+            "mistral": "mistral:latest",
+            "gemma2": "gemma2:9b",
+            "gemma3": "gemma3:latest",
+        }
+        ollama_model = _OLLAMA_ALIASES.get(raw, raw)
         prompt = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
         start = time.perf_counter()
         resp = httpx.post(
             f"{cfg.OLLAMA_API_URL}/api/generate",
-            json={"model": model, "prompt": prompt, "stream": False},
+            json={"model": ollama_model, "prompt": prompt, "stream": False},
             timeout=120,
         )
         resp.raise_for_status()
@@ -298,7 +308,7 @@ def gateway_complete(
     result["cost_usd"] = cost
     result["cache_hit"] = False
 
-    # Persist to DB (async-safe write)
+    # Persist gateway request log
     try:
         req = GatewayRequest(
             project_id=payload.project_id,
@@ -319,9 +329,33 @@ def gateway_complete(
             status_code=200,
         )
         db.add(req)
+
+        # Also persist as a Trace so it appears in the Playground Eval tab selector
+        user_messages = [m for m in payload.messages if m.get("role") == "user"]
+        last_user_message = user_messages[-1]["content"] if user_messages else ""
+        trace = Trace(
+            id=str(__import__("uuid").uuid4()),
+            project_id=payload.project_id,
+            input_data={"question": last_user_message, "messages": payload.messages},
+            output_data={"answer": result["content"]},
+            model=result["model"],
+            temperature=payload.temperature,
+            max_tokens=payload.max_tokens,
+            total_tokens=result.get("total_tokens"),
+            completion_tokens=result.get("completion_tokens"),
+            prompt_tokens=result.get("prompt_tokens"),
+            latency_ms=result.get("latency_ms"),
+            cost_usd=cost,
+            status="success",
+            environment="playground",
+            tags=["playground"],
+        )
+        db.add(trace)
         db.commit()
+        result["trace_id"] = trace.id
     except Exception as exc:
         logger.warning("Failed to persist gateway request: %s", exc)
+        result["trace_id"] = None
 
     # Store in cache
     if payload.use_cache:
@@ -485,3 +519,20 @@ def list_providers(
     """List configured providers for the current user."""
     settings = db.query(APIKeySetting).filter_by(user_id=current_user.id, is_active=True).all()
     return [{"service": s.service, "model": s.model} for s in settings]
+
+
+@router.get("/models")
+def list_ollama_models(
+    current_user: User = Depends(get_current_user),
+):
+    """List models available in the local Ollama instance."""
+    import requests as _req
+    from backend.config import settings as _settings
+    try:
+        resp = _req.get(f"{_settings.OLLAMA_API_URL}/api/tags", timeout=5)
+        resp.raise_for_status()
+        models = [m["name"] for m in resp.json().get("models", [])]
+        return {"models": models, "available": True}
+    except Exception as exc:
+        logger.warning("Could not reach Ollama: %s", exc)
+        return {"models": [], "available": False, "error": str(exc)}

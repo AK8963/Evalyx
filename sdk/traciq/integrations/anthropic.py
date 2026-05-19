@@ -24,7 +24,7 @@ def patch_anthropic(client, project_id: str, trace_metadata: Optional[dict] = No
     :param trace_metadata: Extra metadata merged into every trace
     """
     try:
-        import anthropic as _anthropic
+        import sdk.traciq.integrations.anthropic as _anthropic
     except ImportError:
         logger.warning("anthropic package not installed — skipping patch")
         return

@@ -137,7 +137,7 @@ class TraceContext:
         self.error_message = str(error)
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        from traciq.client import _global_client
+        from sdk.traciq.client import _global_client
         
         if not _global_client:
             logger.warning("TraceIQ client not initialized")

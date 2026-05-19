@@ -22,11 +22,15 @@ router = APIRouter()
 def get_overview(
     project_id: str,
     days: int = Query(7, ge=1, le=90),
+    hours: Optional[int] = Query(None, ge=1, le=72),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """High-level project metrics for the last N days."""
-    since = datetime.utcnow() - timedelta(days=days)
+    """High-level project metrics for the last N days (or hours if hours param provided)."""
+    if hours is not None:
+        since = datetime.utcnow() - timedelta(hours=hours)
+    else:
+        since = datetime.utcnow() - timedelta(days=days)
 
     total_traces = (
         db.query(func.count(Trace.id))
@@ -54,13 +58,43 @@ def get_overview(
         .scalar()
     )
 
+    p95_latency = (
+        db.query(func.percentile_cont(0.95).within_group(Trace.latency_ms.asc()))
+        .filter(Trace.project_id == project_id, Trace.timestamp >= since, Trace.latency_ms.isnot(None))
+        .scalar()
+    )
+    p99_latency = (
+        db.query(func.percentile_cont(0.99).within_group(Trace.latency_ms.asc()))
+        .filter(Trace.project_id == project_id, Trace.timestamp >= since, Trace.latency_ms.isnot(None))
+        .scalar()
+    )
+    prompt_tokens = (
+        db.query(func.sum(Trace.prompt_tokens))
+        .filter(Trace.project_id == project_id, Trace.timestamp >= since, Trace.prompt_tokens.isnot(None))
+        .scalar()
+    )
+    completion_tokens = (
+        db.query(func.sum(Trace.completion_tokens))
+        .filter(Trace.project_id == project_id, Trace.timestamp >= since, Trace.completion_tokens.isnot(None))
+        .scalar()
+    )
+    total_tok = int(total_tokens) if total_tokens else 0
+    total_cst = round(float(total_cost), 6) if total_cost else 0.0
+    cost_per_1k_tokens = round((total_cst / total_tok) * 1000, 6) if total_tok > 0 else None
+
     return {
         "total_traces": total_traces,
         "error_traces": error_traces,
         "error_rate": round(error_traces / max(total_traces, 1), 4),
+        "success_rate": round((total_traces - error_traces) / max(total_traces, 1), 4),
         "avg_latency_ms": round(float(avg_latency), 2) if avg_latency else None,
-        "total_cost_usd": round(float(total_cost), 6) if total_cost else 0.0,
-        "total_tokens": int(total_tokens) if total_tokens else 0,
+        "p95_latency_ms": round(float(p95_latency), 2) if p95_latency else None,
+        "p99_latency_ms": round(float(p99_latency), 2) if p99_latency else None,
+        "total_cost_usd": total_cst,
+        "total_tokens": total_tok,
+        "prompt_tokens": int(prompt_tokens) if prompt_tokens else 0,
+        "completion_tokens": int(completion_tokens) if completion_tokens else 0,
+        "cost_per_1k_tokens": cost_per_1k_tokens,
         "days": days,
     }
 
@@ -68,34 +102,61 @@ def get_overview(
 @router.get("/timeseries")
 def get_timeseries(
     project_id: str,
-    metric: str = Query("trace_count", enum=["trace_count", "error_count", "avg_latency", "total_cost", "total_tokens"]),
+    metric: str = Query("trace_count", enum=["trace_count", "error_count", "avg_latency", "total_cost", "total_tokens", "error_rate", "avg_cost"]),
     days: int = Query(7, ge=1, le=90),
+    hours: Optional[int] = Query(None, ge=1, le=72),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Daily time-series for a chosen metric."""
-    since = datetime.utcnow() - timedelta(days=days)
-
-    # Fetch raw traces in window
-    rows = (
-        db.query(
-            func.date(Trace.timestamp).label("day"),
-            func.count(Trace.id).label("trace_count"),
-            func.count(Trace.id).filter(Trace.status == "error").label("error_count"),
-            func.avg(Trace.latency_ms).label("avg_latency"),
-            func.sum(func.coalesce(Trace.cost_usd, 0)).label("total_cost"),
-            func.sum(func.coalesce(Trace.total_tokens, 0)).label("total_tokens"),
+    """Time-series for a chosen metric. Use hours for sub-day granularity (grouped by hour)."""
+    if hours is not None:
+        since = datetime.utcnow() - timedelta(hours=hours)
+        # Group by hour
+        rows = (
+            db.query(
+                func.date_trunc("hour", Trace.timestamp).label("bucket"),
+                func.count(Trace.id).label("trace_count"),
+                func.count(Trace.id).filter(Trace.status == "error").label("error_count"),
+                func.avg(Trace.latency_ms).label("avg_latency"),
+                func.sum(func.coalesce(Trace.cost_usd, 0)).label("total_cost"),
+                func.sum(func.coalesce(Trace.total_tokens, 0)).label("total_tokens"),
+                (func.count(Trace.id).filter(Trace.status == "error") * 1.0 / func.nullif(func.count(Trace.id), 0)).label("error_rate"),
+                func.avg(Trace.cost_usd).label("avg_cost"),
+            )
+            .filter(Trace.project_id == project_id, Trace.timestamp >= since)
+            .group_by(func.date_trunc("hour", Trace.timestamp))
+            .order_by(func.date_trunc("hour", Trace.timestamp))
+            .all()
         )
-        .filter(Trace.project_id == project_id, Trace.timestamp >= since)
-        .group_by(func.date(Trace.timestamp))
-        .order_by(func.date(Trace.timestamp))
-        .all()
-    )
-
-    series = []
-    for row in rows:
-        value = getattr(row, metric, 0) or 0
-        series.append({"date": str(row.day), "value": round(float(value), 4)})
+        series = []
+        for row in rows:
+            value = getattr(row, metric, 0) or 0
+            bucket = row.bucket
+            label = bucket.strftime("%H:%M") if bucket else "?"
+            series.append({"date": label, "value": round(float(value), 4)})
+    else:
+        since = datetime.utcnow() - timedelta(days=days)
+        # Group by day
+        rows = (
+            db.query(
+                func.date(Trace.timestamp).label("day"),
+                func.count(Trace.id).label("trace_count"),
+                func.count(Trace.id).filter(Trace.status == "error").label("error_count"),
+                func.avg(Trace.latency_ms).label("avg_latency"),
+                func.sum(func.coalesce(Trace.cost_usd, 0)).label("total_cost"),
+                func.sum(func.coalesce(Trace.total_tokens, 0)).label("total_tokens"),
+                (func.count(Trace.id).filter(Trace.status == "error") * 1.0 / func.nullif(func.count(Trace.id), 0)).label("error_rate"),
+                func.avg(Trace.cost_usd).label("avg_cost"),
+            )
+            .filter(Trace.project_id == project_id, Trace.timestamp >= since)
+            .group_by(func.date(Trace.timestamp))
+            .order_by(func.date(Trace.timestamp))
+            .all()
+        )
+        series = []
+        for row in rows:
+            value = getattr(row, metric, 0) or 0
+            series.append({"date": str(row.day), "value": round(float(value), 4)})
 
     return {"metric": metric, "series": series}
 
@@ -104,11 +165,15 @@ def get_timeseries(
 def get_model_breakdown(
     project_id: str,
     days: int = Query(7, ge=1, le=90),
+    hours: Optional[int] = Query(None, ge=1, le=72),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Usage & performance stats broken down by model."""
-    since = datetime.utcnow() - timedelta(days=days)
+    if hours is not None:
+        since = datetime.utcnow() - timedelta(hours=hours)
+    else:
+        since = datetime.utcnow() - timedelta(days=days)
 
     rows = (
         db.query(

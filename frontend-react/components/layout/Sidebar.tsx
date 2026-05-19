@@ -26,6 +26,7 @@ import {
   Shield,
   LogOut,
   ChevronRight,
+  Gauge,
 } from 'lucide-react'
 
 const navGroups = [
@@ -35,8 +36,8 @@ const navGroups = [
       { href: '/', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/traces', label: 'Traces', icon: Activity },
       { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-      { href: '/topics', label: 'Topics', icon: Hash },
-      { href: '/search', label: 'Deep Search', icon: Search },
+     // { href: '/topics', label: 'Topics', icon: Hash },
+      //{ href: '/search', label: 'Deep Search', icon: Search },
     ],
   },
   {
@@ -44,29 +45,30 @@ const navGroups = [
     items: [
       { href: '/experiments', label: 'Experiments', icon: FlaskConical },
       { href: '/datasets', label: 'Datasets', icon: Database },
+      { href: '/metrics', label: 'Metrics', icon: Gauge },
       { href: '/annotations', label: 'Annotations', icon: Star },
-      { href: '/review', label: 'Review Queue', icon: MessageSquare },
-      { href: '/online-scoring', label: 'Online Scoring', icon: Target },
-      { href: '/remote-evals', label: 'Remote Evals', icon: GitCompare },
+      //{ href: '/review', label: 'Review Queue', icon: MessageSquare },
+      //{ href: '/online-scoring', label: 'Online Scoring', icon: Target },
+      //{ href: '/remote-evals', label: 'Remote Evals', icon: GitCompare },
     ],
   },
   {
     label: 'LLM Tools',
     items: [
-      { href: '/prompts', label: 'Prompts', icon: FileText },
+      //{ href: '/prompts', label: 'Prompts', icon: FileText },
       { href: '/playground', label: 'Playground', icon: PlayCircle },
-      { href: '/gateway', label: 'Gateway', icon: Zap },
-      { href: '/ab-tests', label: 'A/B Tests', icon: GitCompare },
+      //{ href: '/gateway', label: 'Gateway', icon: Zap },
+      //{ href: '/ab-tests', label: 'A/B Tests', icon: GitCompare },
     ],
   },
   {
     label: 'Enterprise',
     items: [
-      { href: '/btql', label: 'BTQL Query', icon: Code2 },
-      { href: '/alerts', label: 'Alerts', icon: Bell },
-      { href: '/masking', label: 'Data Masking', icon: EyeOff },
+      //{ href: '/btql', label: 'BTQL Query', icon: Code2 },
+      //{ href: '/alerts', label: 'Alerts', icon: Bell },
+      //{ href: '/masking', label: 'Data Masking', icon: EyeOff },
       { href: '/settings', label: 'Settings', icon: Settings },
-      { href: '/settings/sso', label: 'SSO', icon: Shield },
+      //{ href: '/settings/sso', label: 'SSO', icon: Shield },
     ],
   },
 ]

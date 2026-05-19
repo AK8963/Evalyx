@@ -26,6 +26,11 @@ class DatasetCreate(BaseModel):
     name: str
     description: Optional[str] = None
     source: str = "manual"
+    column_schema: Optional[List[Dict]] = None
+
+
+class DatasetSchemaUpdate(BaseModel):
+    column_schema: List[Dict]
 
 
 class DatasetItemCreate(BaseModel):
@@ -61,6 +66,7 @@ def create_dataset(
         source=payload.source,
         version=1,
         example_count=0,
+        column_schema=payload.column_schema,
     )
     db.add(dataset)
     db.commit()
@@ -229,6 +235,21 @@ def _get_or_404(db: Session, dataset_id: str) -> Dataset:
     return d
 
 
+@router.patch("/{dataset_id}/schema")
+def update_schema(
+    dataset_id: str,
+    payload: DatasetSchemaUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update the column schema for a dataset."""
+    d = _get_or_404(db, dataset_id)
+    d.column_schema = payload.column_schema
+    db.commit()
+    db.refresh(d)
+    return _dataset_dict(d)
+
+
 def _dataset_dict(d: Dataset) -> Dict:
     return {
         "id": d.id,
@@ -238,6 +259,7 @@ def _dataset_dict(d: Dataset) -> Dict:
         "version": d.version,
         "source": d.source,
         "example_count": d.example_count,
+        "column_schema": d.column_schema or [],
         "created_at": d.created_at.isoformat() if d.created_at else None,
     }
 

@@ -31,6 +31,15 @@ export interface Project {
 // ─────────────────────────────────────────────
 export type TraceStatus = 'success' | 'error' | 'pending'
 
+export interface TraceSpan {
+  name: string
+  start_ms?: number
+  duration_ms?: number
+  status?: string
+  attributes?: Record<string, unknown>
+  events?: unknown[]
+}
+
 export interface Trace {
   id: string
   project_id: string
@@ -38,17 +47,23 @@ export interface Trace {
   status: TraceStatus
   input_data?: Record<string, unknown>
   output_data?: Record<string, unknown>
+  expected_output?: Record<string, unknown>
   metadata?: Record<string, unknown>
   latency_ms?: number
   prompt_tokens?: number
   completion_tokens?: number
   total_tokens?: number
+  reasoning_tokens?: number
   cost_usd?: number
+  temperature?: number
+  max_tokens?: number
   error_message?: string
   environment?: string
   tags?: string[]
+  spans?: TraceSpan[]
   timestamp?: string
   created_at?: string
+  updated_at?: string
   scores?: Score[]
 }
 
@@ -59,6 +74,8 @@ export interface TraceListParams {
   limit?: number
   offset?: number
   search?: string
+  hours?: number
+  days?: number
 }
 
 // ─────────────────────────────────────────────
@@ -74,12 +91,14 @@ export interface Score {
 }
 
 export interface Scorer {
-  type: 'llm' | 'code' | 'expected' | 'semantic' | 'regex' | 'custom'
+  type: 'llm' | 'code' | 'expected' | 'semantic' | 'regex' | 'custom' | 'ollama'
   name: string
   prompt?: string
   code?: string
   expected?: string
   threshold?: number
+  model?: string
+  config?: Record<string, unknown>
 }
 
 export interface Eval {
@@ -92,6 +111,11 @@ export interface Eval {
   trace_id?: string
   status: 'pending' | 'running' | 'completed' | 'failed'
   results?: Record<string, unknown>
+  avg_score?: number | null
+  min_score?: number | null
+  max_score?: number | null
+  completed_examples?: number
+  total_examples?: number
   created_at: string
 }
 
@@ -112,6 +136,12 @@ export interface Experiment {
 // ─────────────────────────────────────────────
 // Datasets
 // ─────────────────────────────────────────────
+export interface ColumnDef {
+  key: string
+  label: string
+  built_in: boolean
+}
+
 export interface Dataset {
   id: string
   project_id: string
@@ -119,6 +149,8 @@ export interface Dataset {
   description?: string
   version: number
   item_count?: number
+  example_count?: number
+  column_schema?: ColumnDef[]
   created_at: string
 }
 
@@ -191,6 +223,7 @@ export interface GatewayResponse {
   total_tokens: number
   cost_usd: number
   latency_ms: number
+  trace_id?: string | null
 }
 
 // ─────────────────────────────────────────────
@@ -204,9 +237,14 @@ export interface AnalyticsSummary {
   total_cost_usd: number
   total_tokens: number
   days: number
-  // optional enriched fields
+  // enriched fields (from updated backend)
   success_rate?: number
   error_count?: number
+  p95_latency_ms?: number
+  p99_latency_ms?: number
+  prompt_tokens?: number
+  completion_tokens?: number
+  cost_per_1k_tokens?: number | null
   traces_by_model?: Record<string, number>
   traces_by_status?: Record<string, number>
 }
@@ -296,4 +334,32 @@ export interface BTQLResult {
   rows: unknown[][]
   total_rows: number
   execution_time_ms: number
+}
+
+// ─────────────────────────────────────────────
+// Metrics
+// ─────────────────────────────────────────────
+export type MetricType = 'llm_judge' | 'autoeval' | 'formula' | 'code'
+
+export interface Metric {
+  id: string
+  project_id?: string | null
+  name: string
+  description?: string
+  metric_type: MetricType | string
+  prompt_template?: string
+  config?: Record<string, unknown>
+  is_builtin: boolean
+  created_at: string
+}
+
+export interface AutoevalScorer {
+  name: string
+  description: string
+}
+
+export interface MetricTestResult {
+  score: number
+  explanation: string
+  latency_ms: number
 }

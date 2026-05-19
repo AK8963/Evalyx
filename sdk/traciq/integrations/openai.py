@@ -24,7 +24,7 @@ def patch_openai(client, project_id: str, trace_metadata: Optional[dict] = None)
     :param trace_metadata: Extra metadata merged into every trace
     """
     try:
-        import openai as _openai
+        import sdk.traciq.integrations.openai as _openai
     except ImportError:
         logger.warning("openai package not installed — skipping patch")
         return
