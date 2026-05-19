@@ -84,49 +84,77 @@ Open http://localhost:3010/traces and watch traces arrive in real-time.
 
 ## 🛠️ Architecture
 
+### High-Level Diagram
+
+```mermaid
+flowchart TB
+    subgraph FE["🖥️  Next.js 14 Dashboard — port 3010"]
+        direction LR
+        p1["Dashboard"]
+        p2["Traces"]
+        p3["Analytics"]
+        p4["Experiments"]
+        p5["Datasets"]
+        p6["Metrics"]
+        p7["Annotations"]
+        p8["Playground"]
+        p9["Settings"]
+    end
+
+    subgraph BE["⚙️  FastAPI Backend — port 8000"]
+        direction LR
+        API["REST API  /api/*"]
+        SC["Scoring Engine"]
+        GW["LLM Gateway"]
+        SS["Semantic Search"]
+    end
+
+    subgraph DB["🗄️  Data Layer"]
+        PG[("PostgreSQL\nprimary store")]
+        RD[("Redis\ncache · rate limit")]
+        QD[("Qdrant\nvector store")]
+    end
+
+    subgraph LLM["🤖  LLM Providers"]
+        direction LR
+        OAI["OpenAI"]
+        ANT["Anthropic"]
+        OLL["Ollama\nlocal · $0.00"]
+    end
+
+    SDK["🐍 Python SDK\n@traciq_trace"] -->|"POST /api/traces"| BE
+    APP["Your Application\nREST"] -->|"POST /api/traces"| BE
+    FE <-->|"HTTP /api/*"| BE
+    BE --> DB
+    GW <-->|"completions"| LLM
+```
+
+### Project Structure
+
 ```
 TrustBrain/
 ├── backend/                    # FastAPI REST API (port 8000)
-│   ├── main.py                 # App entry point
-│   ├── config.py
-│   ├── database.py
 │   ├── scoring.py              # Evaluation engine
-│   ├── pricing.py
-│   ├── routes/                 # All /api/* endpoints
-│   │   ├── traces.py
-│   │   ├── auth.py
-│   │   ├── projects.py
-│   │   ├── evals.py
-│   │   ├── experiments.py
-│   │   ├── analytics.py
+│   ├── routes/                 # All /api/* endpoints (20+ modules)
+│   │   ├── traces.py           # Trace ingestion & retrieval
+│   │   ├── analytics.py        # Time-series & model breakdown
+│   │   ├── experiments.py      # Snapshots & regression detection
+│   │   ├── datasets.py         # Golden dataset management
 │   │   ├── metrics.py          # Named scorer definitions + test runner
-│   │   ├── gateway.py
-│   │   ├── review.py
-│   │   ├── prompts.py
-│   │   ├── datasets.py
-│   │   └── ...                 # 20+ route modules
+│   │   ├── annotations.py      # Human labels
+│   │   ├── gateway.py          # Unified LLM proxy (streaming + caching)
+│   │   └── ...
 │   └── search/                 # Semantic search + Qdrant
 ├── frontend-react/             # Next.js 14 dashboard (port 3010)
-│   ├── app/                    # App Router pages
-│   │   └── (dashboard)/        # Dashboard, Traces, Analytics, Metrics, ...
-│   ├── components/             # Shared UI components
-│   ├── lib/                    # API client, utils
-│   └── types/                  # TypeScript interfaces
-├── sdk/                        # Python SDK
-│   └── traciq/
-│       ├── client.py           # TraceIQClient
-│       ├── decorators.py       # @traciq_trace
-│       └── integrations/       # OpenAI, LangChain patches
+│   └── app/(dashboard)/        # Dashboard · Traces · Analytics · Experiments
+│                               # Datasets · Metrics · Annotations · Playground · Settings
+├── sdk/traciq/                 # Python SDK
+│   ├── client.py               # TraceIQClient
+│   ├── decorators.py           # @traciq_trace
+│   └── integrations/           # OpenAI, Anthropic patches
 ├── database/                   # SQLAlchemy models + migrations
-├── examples/
-│   ├── seed_demo_data.py        # Seeds realistic demo traces
-│   ├── seed_devtest.py          # Seeds dev/test data
-│   └── ollama_live_demo/       # Live Ollama tracing demo
-├── docs/                       # Full documentation ← start here
-│   ├── screenshots/
-│   ├── INSTALLATION.md
-│   ├── PAGES_GUIDE.md
-│   └── SDK_INTEGRATION.md
+├── examples/                   # Seed scripts + Ollama live demo
+├── docs/                       # Full documentation <- start here
 ├── Dockerfile.backend
 ├── Dockerfile.frontend
 └── docker-compose.yml
