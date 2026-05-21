@@ -2,7 +2,7 @@
 Trace routes - ingestion and retrieval of LLM traces.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
 from pydantic import BaseModel
@@ -17,6 +17,60 @@ import uuid
 import json
 
 router = APIRouter()
+
+
+def _estimate_tokens(data: Any) -> int:
+    """Rough token count estimate: JSON characters / 4 (OpenAI BPE approximation)."""
+    if not data:
+        return 0
+    try:
+        text = json.dumps(data, ensure_ascii=False, default=str)
+        return max(1, len(text) // 4)
+    except Exception:
+        return 0
+
+
+def _resolve_prompt_tokens(trace) -> Optional[int]:
+    if trace.prompt_tokens is not None:
+        return trace.prompt_tokens
+    if trace.input_data:
+        return _estimate_tokens(trace.input_data)
+    return None
+
+
+def _resolve_completion_tokens(trace) -> Optional[int]:
+    if trace.completion_tokens is not None:
+        return trace.completion_tokens
+    if trace.output_data:
+        return _estimate_tokens(trace.output_data)
+    return None
+
+
+def _resolve_total_tokens(trace) -> Optional[int]:
+    if trace.total_tokens is not None:
+        return trace.total_tokens
+    if trace.prompt_tokens is not None or trace.completion_tokens is not None:
+        return (trace.prompt_tokens or 0) + (trace.completion_tokens or 0)
+    if trace.input_data or trace.output_data:
+        return _estimate_tokens(trace.input_data) + _estimate_tokens(trace.output_data)
+    return None
+
+
+def _resolve_cost(trace, custom_overrides: dict = None) -> Optional[float]:
+    if trace.cost_usd is not None:
+        return trace.cost_usd
+    if trace.model:
+        pt = _resolve_prompt_tokens(trace)
+        ct = _resolve_completion_tokens(trace)
+        tt = _resolve_total_tokens(trace)
+        return estimate_cost(
+            trace.model,
+            prompt_tokens=pt or 0,
+            completion_tokens=ct or 0,
+            total_tokens=tt or 0,
+            custom_overrides=custom_overrides or None,
+        )
+    return None
 
 
 class TraceInput(BaseModel):
@@ -56,9 +110,13 @@ class TraceResponse(BaseModel):
     status: str
     latency_ms: Optional[float] = None
     cost_usd: Optional[float] = None
+    total_tokens: Optional[int] = None
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
     timestamp: datetime
     tags: Optional[List[str]] = None
-    
+    score_count: int = 0
+
     class Config:
         from_attributes = True
 
@@ -100,6 +158,7 @@ def _cost_for_ingest(trace_input: "TraceInput", user_id: str, db: "Session") -> 
 @router.post("/batch", status_code=201)
 async def ingest_traces(
     traces: List[TraceInput],
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -158,14 +217,25 @@ async def ingest_traces(
     # Create trace records
     created_traces = []
     for trace_input in traces:
+        # Estimate tokens from content when not provided by caller
+        prompt_tokens = trace_input.prompt_tokens
+        completion_tokens = trace_input.completion_tokens
+        total_tokens = trace_input.total_tokens
+        if prompt_tokens is None and completion_tokens is None and total_tokens is None:
+            prompt_tokens = _estimate_tokens(trace_input.input_data)
+            completion_tokens = _estimate_tokens(trace_input.output_data)
+            total_tokens = prompt_tokens + completion_tokens
+        elif total_tokens is None and (prompt_tokens is not None or completion_tokens is not None):
+            total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
+
         # Auto-calculate cost if not provided by the client
         cost = trace_input.cost_usd
         if cost is None and trace_input.model:
             cost = estimate_cost(
                 trace_input.model,
-                prompt_tokens=trace_input.prompt_tokens or 0,
-                completion_tokens=trace_input.completion_tokens or 0,
-                total_tokens=trace_input.total_tokens or 0,
+                prompt_tokens=prompt_tokens or 0,
+                completion_tokens=completion_tokens or 0,
+                total_tokens=total_tokens or 0,
                 custom_overrides=custom_overrides or None,
             )
 
@@ -185,9 +255,9 @@ async def ingest_traces(
             model=trace_input.model,
             temperature=trace_input.temperature,
             max_tokens=trace_input.max_tokens,
-            total_tokens=trace_input.total_tokens,
-            completion_tokens=trace_input.completion_tokens,
-            prompt_tokens=trace_input.prompt_tokens,
+            total_tokens=total_tokens,
+            completion_tokens=completion_tokens,
+            prompt_tokens=prompt_tokens,
             cost_usd=cost,
             latency_ms=trace_input.latency_ms,
             status=trace_input.status,
@@ -206,6 +276,19 @@ async def ingest_traces(
     # Refresh to get IDs
     for trace in created_traces:
         db.refresh(trace)
+
+    # Trigger online scoring rules in the background for each new trace
+    from backend.routes.online_scoring import run_online_scoring
+    from database.models import OnlineScoringRule as _OnlineScoringRule
+    rules_cache: dict = {}
+    for trace in created_traces:
+        pid = trace.project_id
+        if pid not in rules_cache:
+            rules = db.query(_OnlineScoringRule).filter_by(project_id=pid, is_active=True).all()
+            rules_cache[pid] = [r.id for r in rules]
+        rule_ids = rules_cache[pid]
+        if rule_ids:
+            background_tasks.add_task(run_online_scoring, trace.id, rule_ids)
     
     return {
         "status": "success",
@@ -217,11 +300,12 @@ async def ingest_traces(
 @router.post("", response_model=TraceResponse, status_code=201)
 async def create_trace(
     trace_input: TraceInput,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a single trace."""
-    result = await ingest_traces([trace_input], current_user, db)
+    result = await ingest_traces([trace_input], background_tasks, current_user, db)
     trace_id = result["trace_ids"][0]
     return db.query(Trace).filter(Trace.id == trace_id).first()
 
@@ -276,10 +360,10 @@ async def get_trace(
         model=trace.model,
         status=trace.status,
         latency_ms=trace.latency_ms,
-        cost_usd=trace.cost_usd,
-        total_tokens=trace.total_tokens,
-        completion_tokens=trace.completion_tokens,
-        prompt_tokens=trace.prompt_tokens,
+        cost_usd=_resolve_cost(trace),
+        total_tokens=_resolve_total_tokens(trace),
+        completion_tokens=_resolve_completion_tokens(trace),
+        prompt_tokens=_resolve_prompt_tokens(trace),
         error_message=trace.error_message,
         environment=getattr(trace, 'environment', None),
         tags=trace.tags,
@@ -297,8 +381,12 @@ async def get_trace(
 async def list_traces(
     project_id: str,
     model: Optional[str] = None,
-    status_filter: Optional[str] = None,
+    status: Optional[str] = None,
     environment: Optional[str] = None,
+    min_latency_ms: Optional[float] = None,
+    max_latency_ms: Optional[float] = None,
+    has_scores: Optional[bool] = None,
+    session_id: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
     hours: Optional[int] = None,
@@ -307,6 +395,7 @@ async def list_traces(
     db: Session = Depends(get_db)
 ):
     """List traces with filters."""
+    from database.models import Session as SessionModel
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.owner_id == current_user.id
@@ -318,17 +407,76 @@ async def list_traces(
 
     if model:
         query = query.filter(Trace.model == model)
-    if status_filter:
-        query = query.filter(Trace.status == status_filter)
+    if status:
+        query = query.filter(Trace.status == status)
     if environment:
         query = query.filter(Trace.environment == environment)
+    if min_latency_ms is not None:
+        query = query.filter(Trace.latency_ms >= min_latency_ms)
+    if max_latency_ms is not None:
+        query = query.filter(Trace.latency_ms <= max_latency_ms)
     if hours is not None:
         query = query.filter(Trace.timestamp >= datetime.utcnow() - timedelta(hours=hours))
     elif days is not None:
         query = query.filter(Trace.timestamp >= datetime.utcnow() - timedelta(days=days))
+    if has_scores is True:
+        from sqlalchemy import exists
+        query = query.filter(exists().where(Score.trace_id == Trace.id))
+    elif has_scores is False:
+        from sqlalchemy import exists
+        query = query.filter(~exists().where(Score.trace_id == Trace.id))
+    if session_id:
+        sess = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+        session_trace_ids = sess.trace_ids if sess and sess.trace_ids else []
+        if not session_trace_ids:
+            return []
+        query = query.filter(Trace.id.in_(session_trace_ids))
 
     traces = query.order_by(desc(Trace.timestamp)).limit(limit).offset(offset).all()
-    return traces
+
+    # Load user's custom pricing overrides (for cost estimation of old traces)
+    custom_rows = db.query(ModelPricing).filter(ModelPricing.user_id == current_user.id).all()
+    custom_overrides = {
+        r.model.lower(): {
+            "prompt_cost_per_1k": float(r.prompt_cost_per_1k),
+            "completion_cost_per_1k": float(r.completion_cost_per_1k),
+            "is_free": r.is_free,
+        }
+        for r in custom_rows
+    }
+
+    # Attach score counts in a single query
+    from sqlalchemy import func as sqlfunc
+    trace_ids = [t.id for t in traces]
+    score_counts: dict = {}
+    if trace_ids:
+        rows = (
+            db.query(Score.trace_id, sqlfunc.count(Score.id).label('cnt'))
+            .filter(Score.trace_id.in_(trace_ids))
+            .group_by(Score.trace_id)
+            .all()
+        )
+        score_counts = {r.trace_id: r.cnt for r in rows}
+
+    return [
+        {
+            'id': t.id,
+            'project_id': t.project_id,
+            'input_data': t.input_data,
+            'output_data': t.output_data,
+            'model': t.model,
+            'status': t.status,
+            'latency_ms': t.latency_ms,
+            'cost_usd': _resolve_cost(t, custom_overrides),
+            'timestamp': t.timestamp,
+            'tags': t.tags,
+            'total_tokens': _resolve_total_tokens(t),
+            'prompt_tokens': _resolve_prompt_tokens(t),
+            'completion_tokens': _resolve_completion_tokens(t),
+            'score_count': score_counts.get(t.id, 0),
+        }
+        for t in traces
+    ]
 
 
 @router.delete("/{trace_id}", status_code=204)
@@ -371,6 +519,7 @@ async def delete_trace(
 @router.post("/ingest", status_code=201, tags=["sdk"])
 async def ingest_single_trace(
     trace_input: TraceInput,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -423,6 +572,17 @@ async def ingest_single_trace(
         if not project:
             raise HTTPException(status_code=403, detail="Access denied to project")
 
+    # Estimate tokens from content when not provided by caller
+    _prompt_tokens = trace_input.prompt_tokens
+    _completion_tokens = trace_input.completion_tokens
+    _total_tokens = trace_input.total_tokens
+    if _prompt_tokens is None and _completion_tokens is None and _total_tokens is None:
+        _prompt_tokens = _estimate_tokens(trace_input.input_data)
+        _completion_tokens = _estimate_tokens(trace_input.output_data)
+        _total_tokens = _prompt_tokens + _completion_tokens
+    elif _total_tokens is None and (_prompt_tokens is not None or _completion_tokens is not None):
+        _total_tokens = (_prompt_tokens or 0) + (_completion_tokens or 0)
+
     trace = Trace(
         id=str(uuid.uuid4()),
         project_id=trace_input.project_id,
@@ -432,9 +592,9 @@ async def ingest_single_trace(
         model=trace_input.model,
         temperature=trace_input.temperature,
         max_tokens=trace_input.max_tokens,
-        total_tokens=trace_input.total_tokens,
-        completion_tokens=trace_input.completion_tokens,
-        prompt_tokens=trace_input.prompt_tokens,
+        total_tokens=_total_tokens,
+        completion_tokens=_completion_tokens,
+        prompt_tokens=_prompt_tokens,
         cost_usd=trace_input.cost_usd if trace_input.cost_usd is not None else _cost_for_ingest(
             trace_input, current_user.id, db
         ),
@@ -449,4 +609,12 @@ async def ingest_single_trace(
     db.add(trace)
     db.commit()
     db.refresh(trace)
+
+    # Trigger online scoring rules in background
+    from backend.routes.online_scoring import run_online_scoring
+    from database.models import OnlineScoringRule as _OnlineScoringRule
+    rules = db.query(_OnlineScoringRule).filter_by(project_id=trace.project_id, is_active=True).all()
+    if rules:
+        background_tasks.add_task(run_online_scoring, trace.id, [r.id for r in rules])
+
     return {"id": trace.id, "project_id": trace.project_id, "status": "accepted"}

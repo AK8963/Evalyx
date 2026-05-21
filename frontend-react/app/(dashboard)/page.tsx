@@ -129,8 +129,9 @@ const TIME_FILTERS = [
 type TF = typeof TIME_FILTERS[number]
 
 function getApiParams(tf: TF): { days?: number; hours?: number } {
-  if ('hours' in tf) return { hours: tf.hours }
-  return { days: tf.days }
+  if ('hours' in tf && (tf as {hours?: number}).hours !== undefined) return { hours: (tf as {hours?: number}).hours }
+  if ('days' in tf && (tf as {days?: number}).days !== undefined) return { days: (tf as {days?: number}).days }
+  return {}  // All = no time filter
 }
 
 export default function DashboardPage() {
@@ -140,39 +141,39 @@ export default function DashboardPage() {
 
   const { data: summary } = useQuery({
     queryKey: ['analytics-summary', project?.id, activeFilter.label],
-    queryFn: () => api.analytics.summary(project!.id, apiParams.days ?? 7, apiParams.hours),
+    queryFn: () => api.analytics.summary(project!.id, apiParams.days, apiParams.hours),
     enabled: !!project,
   })
 
   const { data: latencyTs } = useQuery({
     queryKey: ['ts-avg_latency', project?.id, activeFilter.label],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'avg_latency', apiParams.days ?? 7, apiParams.hours),
+    queryFn: () => api.analytics.timeSeries(project!.id, 'avg_latency', apiParams.days, apiParams.hours),
     enabled: !!project,
   })
   const { data: countTs } = useQuery({
     queryKey: ['ts-trace_count', project?.id, activeFilter.label],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'trace_count', apiParams.days ?? 7, apiParams.hours),
+    queryFn: () => api.analytics.timeSeries(project!.id, 'trace_count', apiParams.days, apiParams.hours),
     enabled: !!project,
   })
   const { data: costTs } = useQuery({
     queryKey: ['ts-total_cost', project?.id, activeFilter.label],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'total_cost', apiParams.days ?? 7, apiParams.hours),
+    queryFn: () => api.analytics.timeSeries(project!.id, 'total_cost', apiParams.days, apiParams.hours),
     enabled: !!project,
   })
   const { data: tokenTs } = useQuery({
     queryKey: ['ts-total_tokens', project?.id, activeFilter.label],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'total_tokens', apiParams.days ?? 7, apiParams.hours),
+    queryFn: () => api.analytics.timeSeries(project!.id, 'total_tokens', apiParams.days, apiParams.hours),
     enabled: !!project,
   })
   const { data: errorTs } = useQuery({
     queryKey: ['ts-error_count', project?.id, activeFilter.label],
-    queryFn: () => api.analytics.timeSeries(project!.id, 'error_count', apiParams.days ?? 7, apiParams.hours),
+    queryFn: () => api.analytics.timeSeries(project!.id, 'error_count', apiParams.days, apiParams.hours),
     enabled: !!project,
   })
 
   const { data: modelStats = [] } = useQuery({
     queryKey: ['analytics-models', project?.id, activeFilter.label],
-    queryFn: () => api.analytics.models(project!.id, apiParams.days ?? 7, apiParams.hours),
+    queryFn: () => api.analytics.models(project!.id, apiParams.days, apiParams.hours),
     enabled: !!project,
   })
 

@@ -162,9 +162,9 @@ class OllamaScorer:
         Returns (score, explanation)
         """
         try:
-            import requests
-            import asyncio
-            
+            import httpx
+            import re
+
             prompt = f"""You are evaluating an AI output. Rate it from 0 to 1.
 
 Input: {json.dumps(trace.input_data, default=str)}
@@ -183,28 +183,29 @@ Format your response as:
 SCORE: [number]
 EXPLANATION: [text]
 """
-            
-            # Call Ollama API
+
+            # Call Ollama API asynchronously (non-blocking)
             _raw = self.model.replace("ollama-", "") if self.model.startswith("ollama-") else self.model
             _ALIASES = {"llama3": "llama3:8b", "llama2": "llama2:latest", "mistral": "mistral:latest", "gemma2": "gemma2:9b"}
             ollama_model = _ALIASES.get(_raw, _raw)
-            response = requests.post(
-                f"{self.ollama_url}/api/generate",
-                json={
-                    "model": ollama_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.3,
-                }
-            )
-            
+
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    f"{self.ollama_url}/api/generate",
+                    json={
+                        "model": ollama_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "temperature": 0.3,
+                    },
+                )
+
             if response.status_code != 200:
                 raise Exception(f"Ollama API error: {response.text}")
-            
+
             result = response.json().get("response", "")
-            
+
             # Robust regex parsing — handles prose around the score value
-            import re
             score_match = re.search(r'SCORE:\s*([0-9]*\.?[0-9]+)', result, re.IGNORECASE)
             expl_match = re.search(r'EXPLANATION:\s*(.+?)(?:\n|$)', result, re.IGNORECASE | re.DOTALL)
 
@@ -219,7 +220,7 @@ EXPLANATION: [text]
             explanation = expl_match.group(1).strip() if expl_match else result.strip()[:300]
 
             return score, explanation
-            
+
         except Exception as e:
             logger.error(f"Error in Ollama scorer: {e}")
             raise

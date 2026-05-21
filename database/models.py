@@ -1372,3 +1372,40 @@ class ReviewTask(Base):
 
     def __repr__(self):
         return f"<ReviewTask {self.id} status={self.status}>"
+
+
+# ---------------------------------------------------------------------------
+# Session: group multiple traces under a named session
+# ---------------------------------------------------------------------------
+
+class Session(Base):
+    """Session model - groups related traces into a named session with scoring."""
+    __tablename__ = "sessions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=False, index=True)
+    created_by = Column(String(36), ForeignKey("users.id"), nullable=True)
+
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Trace association stored as JSON array of trace ID strings
+    trace_ids = Column(JSON, nullable=False, default=list)
+
+    # Scoring
+    manual_score = Column(Float, nullable=True)          # Human-defined 0-1 score
+    aggregate_scores = Column(JSON, nullable=False, default=dict)  # {scorer_name: avg_score}
+
+    # Flexible metadata and tags
+    meta = Column(JSON, nullable=False, default=dict)
+    tags = Column(JSON, nullable=False, default=list)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_sessions_project", "project_id"),
+    )
+
+    def __repr__(self):
+        return f"<Session {self.name}>"

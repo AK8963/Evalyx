@@ -65,12 +65,18 @@ export interface Trace {
   created_at?: string
   updated_at?: string
   scores?: Score[]
+  score_count?: number
 }
 
 export interface TraceListParams {
   project_id: string
   model?: string
   status?: string
+  environment?: string
+  min_latency_ms?: number
+  max_latency_ms?: number
+  has_scores?: boolean
+  session_id?: string
   limit?: number
   offset?: number
   search?: string
@@ -84,10 +90,57 @@ export interface TraceListParams {
 export interface Score {
   id: string
   trace_id: string
+  project_id: string
+  scorer_name: string
   scorer_type: string
-  score: number
-  reasoning?: string
+  score_value: number
+  explanation?: string
+  scorer_config?: Record<string, unknown>
+  model_used?: string
   created_at: string
+  updated_at?: string
+  // trace context (populated by /api/scores endpoint)
+  trace?: {
+    model?: string
+    status?: string
+    latency_ms?: number
+    total_tokens?: number
+    cost_usd?: number
+    timestamp?: string
+    input_data?: Record<string, unknown>
+    output_data?: Record<string, unknown>
+  }
+}
+
+// ─────────────────────────────────────────────
+// Sessions
+// ─────────────────────────────────────────────
+export interface SessionTrace {
+  id: string
+  model?: string
+  status?: string
+  latency_ms?: number
+  total_tokens?: number
+  prompt_tokens?: number
+  completion_tokens?: number
+  cost_usd?: number
+  timestamp?: string
+}
+
+export interface Session {
+  id: string
+  project_id: string
+  name: string
+  description?: string
+  trace_ids: string[]
+  trace_count: number
+  traces?: SessionTrace[]
+  manual_score?: number
+  aggregate_scores: Record<string, number>
+  meta: Record<string, unknown>
+  tags: string[]
+  created_at: string
+  updated_at?: string
 }
 
 export interface Scorer {
@@ -167,6 +220,16 @@ export interface DatasetItem {
 // Annotations
 // ─────────────────────────────────────────────
 export type AnnotationType = 'thumbs_up' | 'thumbs_down' | 'rating' | 'label' | 'comment'
+
+export interface AnnotationCreate {
+  trace_id: string
+  project_id: string
+  thumbs_up?: boolean
+  rating?: number
+  comment?: string
+  label_ids?: string[]
+  corrected_output?: unknown
+}
 
 export interface Annotation {
   id: string

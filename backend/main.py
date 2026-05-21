@@ -143,6 +143,8 @@ from backend.routes import (
     sso, alerts, masking, metrics,
 )
 from backend.routes import review
+from backend.routes import sessions as sessions_routes
+from backend.routes import scores as scores_routes
 
 # ── Core ────────────────────────────────────────────────────────────────────
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
@@ -195,6 +197,8 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(masking.router, prefix="/api/masking", tags=["masking"])
 # ── Showcase Features ───────────────────────────────────────────────────────────
 app.include_router(review.router, prefix="/api/review", tags=["review"])
+app.include_router(sessions_routes.router, prefix="/api/sessions", tags=["sessions"])
+app.include_router(scores_routes.router, prefix="/api/scores", tags=["scores"])
 
 if __name__ == "__main__":
     import uvicorn

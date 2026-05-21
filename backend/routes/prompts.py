@@ -27,17 +27,22 @@ class PromptCreate(BaseModel):
     name: str
     description: Optional[str] = None
     template: str
-    variables: Dict = {}
+    variables: Any = None
     default_model: Optional[str] = None
     default_params: Dict = {}
 
 
 class PromptUpdate(BaseModel):
     template: str
-    variables: Optional[Dict] = None
+    variables: Optional[Any] = None
     default_model: Optional[str] = None
     default_params: Optional[Dict] = None
     commit_message: Optional[str] = None
+
+
+class RenderPayload(BaseModel):
+    variables: Dict[str, Any] = {}
+    version_number: Optional[int] = None
 
 
 class DeploymentCreate(BaseModel):
@@ -257,8 +262,7 @@ def list_deployments(
 @router.post("/{prompt_id}/render")
 def render_prompt(
     prompt_id: str,
-    variables: Dict[str, Any],
-    version_number: Optional[int] = None,
+    payload: RenderPayload,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -266,12 +270,12 @@ def render_prompt(
     p = _get_or_404(db, prompt_id)
     template = p.template
 
-    if version_number:
-        v = db.query(PromptVersion).filter_by(prompt_id=prompt_id, version_number=version_number).first()
+    if payload.version_number:
+        v = db.query(PromptVersion).filter_by(prompt_id=prompt_id, version_number=payload.version_number).first()
         if v:
             template = v.template
 
-    for key, val in variables.items():
+    for key, val in payload.variables.items():
         template = template.replace(f"{{{{{key}}}}}", str(val))
 
     return {"rendered": template, "prompt_id": prompt_id}
@@ -289,16 +293,30 @@ def _get_or_404(db: Session, prompt_id: str) -> Prompt:
 
 
 def _prompt_dict(p: Prompt) -> Dict:
+    vars_val = p.variables
+    if isinstance(vars_val, dict):
+        vars_list = list(vars_val.keys())
+    elif isinstance(vars_val, list):
+        vars_list = vars_val
+    else:
+        vars_list = []
+    is_deployed = any(
+        d.status == "active" for d in (p.deployments or [])
+    )
     return {
         "id": p.id,
         "project_id": p.project_id,
         "name": p.name,
         "description": p.description,
         "template": p.template,
-        "variables": p.variables,
+        "variables": vars_list,
+        "model": p.default_model,
         "default_model": p.default_model,
+        "model_params": p.default_params,
         "default_params": p.default_params,
+        "version": p.latest_version or 1,
         "latest_version": p.latest_version,
+        "is_deployed": is_deployed,
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "updated_at": p.updated_at.isoformat() if p.updated_at else None,
     }

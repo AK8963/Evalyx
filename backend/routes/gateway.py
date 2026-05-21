@@ -11,7 +11,7 @@ import logging
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -197,8 +197,10 @@ def _call_provider(
     if provider == "ollama":
         import httpx
         from backend.config import settings as cfg
-        # Strip the "ollama-" prefix and resolve short aliases to full tag names
+        # Strip provider prefixes ("ollama/" or "ollama-") then resolve aliases
         raw = model.replace("ollama-", "") if model.startswith("ollama-") else model
+        if raw.startswith("ollama/"):
+            raw = raw.split("/", 1)[1]
         _OLLAMA_ALIASES = {
             "llama3": "llama3:8b",
             "llama2": "llama2:latest",
@@ -260,6 +262,7 @@ def _estimate_cost(model: str, prompt_tokens: Optional[int], completion_tokens: 
 @router.post("/complete")
 def gateway_complete(
     payload: GatewayCompletionRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -353,6 +356,13 @@ def gateway_complete(
         db.add(trace)
         db.commit()
         result["trace_id"] = trace.id
+
+        # Trigger online scoring rules in background
+        from backend.routes.online_scoring import run_online_scoring
+        from database.models import OnlineScoringRule
+        rules = db.query(OnlineScoringRule).filter_by(project_id=payload.project_id, is_active=True).all()
+        if rules:
+            background_tasks.add_task(run_online_scoring, trace.id, [r.id for r in rules])
     except Exception as exc:
         logger.warning("Failed to persist gateway request: %s", exc)
         result["trace_id"] = None

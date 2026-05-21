@@ -129,16 +129,16 @@ def score_trace(
     if not rules:
         return {"message": "No active scoring rules for this project", "scored": 0}
 
-    background_tasks.add_task(_run_scoring, trace_id, [r.id for r in rules])
+    background_tasks.add_task(run_online_scoring, trace_id, [r.id for r in rules])
     return {"message": "Scoring queued", "rules_applied": len(rules), "trace_id": trace_id}
 
 
 # ---------------------------------------------------------------------------
-# Background scoring task
+# Public async background scoring task (called from traces & gateway routes)
 # ---------------------------------------------------------------------------
 
-def _run_scoring(trace_id: str, rule_ids: List[str]) -> None:
-    """Apply scoring rules to a trace in the background."""
+async def run_online_scoring(trace_id: str, rule_ids: List[str]) -> None:
+    """Apply active scoring rules to a trace. Handles llm / code / expected types."""
     import random
     from backend.database import SessionLocal
 
@@ -157,15 +157,21 @@ def _run_scoring(trace_id: str, rule_ids: List[str]) -> None:
             if random.random() > rule.sample_rate:
                 continue
 
-            score_value = _apply_scorer(rule, trace, db)
+            # Check filter conditions (simple key=value matching on trace meta/tags)
+            if rule.filter_conditions:
+                if not _matches_filter(trace, rule.filter_conditions):
+                    continue
+
+            score_value = await _apply_scorer_async(rule, trace)
             if score_value is not None:
                 score = Score(
                     trace_id=trace_id,
                     project_id=trace.project_id,
-                    scorer_name=rule.name,
+                    scorer_name=rule.scorer_config.get("metric_name", rule.name),
                     scorer_type=rule.scorer_type,
                     score_value=score_value,
                     scorer_config=rule.scorer_config,
+                    model_used=rule.scorer_config.get("model") if rule.scorer_type == "llm" else None,
                 )
                 db.add(score)
 
@@ -176,14 +182,14 @@ def _run_scoring(trace_id: str, rule_ids: List[str]) -> None:
         db.close()
 
 
-def _apply_scorer(rule: OnlineScoringRule, trace: Trace, db) -> Optional[float]:
-    """Dispatch to appropriate scorer and return 0-1 float."""
+async def _apply_scorer_async(rule: "OnlineScoringRule", trace: "Trace") -> Optional[float]:
+    """Dispatch to the right scorer; return a 0–1 score or None on failure."""
     try:
         if rule.scorer_type == "expected":
             if trace.expected_output and trace.output_data:
-                out = str(trace.output_data)
-                exp = str(trace.expected_output)
-                return 1.0 if out.strip() == exp.strip() else (0.5 if exp in out else 0.0)
+                out = str(trace.output_data).strip()
+                exp = str(trace.expected_output).strip()
+                return 1.0 if out == exp else (0.5 if exp in out else 0.0)
             return None
 
         if rule.scorer_type == "code":
@@ -201,12 +207,53 @@ def _apply_scorer(rule: OnlineScoringRule, trace: Trace, db) -> Optional[float]:
                     return float(val)
             return None
 
-        # LLM scorer — placeholder (full impl in backend/scoring.py)
+        if rule.scorer_type == "llm":
+            from backend.scoring import score_single_trace
+            metric_name = rule.scorer_config.get("metric_name", rule.name)
+            model = rule.scorer_config.get("model", "llama2")
+            prompt_template = rule.scorer_config.get("prompt_template", "")
+            if not prompt_template:
+                logger.warning("Online scoring rule '%s' has no prompt_template — skipping", rule.name)
+                return None
+            result = await score_single_trace(trace, metric_name, model, prompt_template)
+            return result.get("score")
+
         return None
 
     except Exception as exc:
         logger.warning("Scorer %s failed: %s", rule.name, exc)
         return None
+
+
+def _matches_filter(trace: "Trace", conditions: Dict) -> bool:
+    """Return True if trace satisfies all filter conditions."""
+    for key, val in conditions.items():
+        if key == "environment" and getattr(trace, "environment", None) != val:
+            return False
+        if key == "model" and getattr(trace, "model", None) != val:
+            return False
+        if key == "status" and getattr(trace, "status", None) != val:
+            return False
+        if key == "tag" and val not in (trace.tags or []):
+            return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Legacy sync scorer (kept for backward compatibility)
+# ---------------------------------------------------------------------------
+
+def _run_scoring(trace_id: str, rule_ids: List[str]) -> None:
+    """Sync wrapper — calls the async scorer via asyncio."""
+    import asyncio
+    try:
+        asyncio.run(run_online_scoring(trace_id, rule_ids))
+    except RuntimeError:
+        # Already inside an event loop (e.g. tests) — schedule a task instead
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(asyncio.run, run_online_scoring(trace_id, rule_ids))
+            future.result(timeout=60)
 
 
 # ---------------------------------------------------------------------------

@@ -21,16 +21,18 @@ router = APIRouter()
 @router.get("/overview")
 def get_overview(
     project_id: str,
-    days: int = Query(7, ge=1, le=90),
-    hours: Optional[int] = Query(None, ge=1, le=72),
+    days: Optional[int] = Query(None),
+    hours: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """High-level project metrics for the last N days (or hours if hours param provided)."""
     if hours is not None:
         since = datetime.utcnow() - timedelta(hours=hours)
-    else:
+    elif days is not None:
         since = datetime.utcnow() - timedelta(days=days)
+    else:
+        since = datetime(2000, 1, 1)  # all time
 
     total_traces = (
         db.query(func.count(Trace.id))
@@ -103,8 +105,8 @@ def get_overview(
 def get_timeseries(
     project_id: str,
     metric: str = Query("trace_count", enum=["trace_count", "error_count", "avg_latency", "total_cost", "total_tokens", "error_rate", "avg_cost"]),
-    days: int = Query(7, ge=1, le=90),
-    hours: Optional[int] = Query(None, ge=1, le=72),
+    days: Optional[int] = Query(None),
+    hours: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -135,7 +137,10 @@ def get_timeseries(
             label = bucket.strftime("%H:%M") if bucket else "?"
             series.append({"date": label, "value": round(float(value), 4)})
     else:
-        since = datetime.utcnow() - timedelta(days=days)
+        if days is not None:
+            since = datetime.utcnow() - timedelta(days=days)
+        else:
+            since = datetime(2000, 1, 1)  # all time
         # Group by day
         rows = (
             db.query(
@@ -164,16 +169,18 @@ def get_timeseries(
 @router.get("/models")
 def get_model_breakdown(
     project_id: str,
-    days: int = Query(7, ge=1, le=90),
-    hours: Optional[int] = Query(None, ge=1, le=72),
+    days: Optional[int] = Query(None),
+    hours: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Usage & performance stats broken down by model."""
     if hours is not None:
         since = datetime.utcnow() - timedelta(hours=hours)
-    else:
+    elif days is not None:
         since = datetime.utcnow() - timedelta(days=days)
+    else:
+        since = datetime(2000, 1, 1)  # all time
 
     rows = (
         db.query(
@@ -207,12 +214,12 @@ def get_model_breakdown(
 def get_score_trends(
     project_id: str,
     scorer_name: Optional[str] = None,
-    days: int = Query(7, ge=1, le=90),
+    days: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Average scores over time, optionally filtered to one scorer."""
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime(2000, 1, 1) if days is None else datetime.utcnow() - timedelta(days=days)
 
     q = db.query(
         func.date(Score.created_at).label("day"),

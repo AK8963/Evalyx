@@ -81,7 +81,7 @@ export default function AnnotationsPage() {
       if (thumbs != null) payload.thumbs_up = thumbs
       if (rating > 0) payload.rating = rating
       if (comment.trim()) payload.comment = comment.trim()
-      return api.annotations.create(payload as Partial<Annotation>)
+      return api.annotations.create(payload as unknown as import('@/types').AnnotationCreate)
     },
     onSuccess: () => {
       toast.success('Annotation saved')

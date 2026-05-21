@@ -27,6 +27,8 @@ import {
   LogOut,
   ChevronRight,
   Gauge,
+  Layers,
+  TrendingUp,
 } from 'lucide-react'
 
 const navGroups = [
@@ -35,6 +37,7 @@ const navGroups = [
     items: [
       { href: '/', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/traces', label: 'Traces', icon: Activity },
+      { href: '/sessions', label: 'Sessions', icon: Layers },
       { href: '/analytics', label: 'Analytics', icon: BarChart3 },
      // { href: '/topics', label: 'Topics', icon: Hash },
       //{ href: '/search', label: 'Deep Search', icon: Search },
@@ -44,6 +47,7 @@ const navGroups = [
     label: 'Evaluation',
     items: [
       { href: '/experiments', label: 'Experiments', icon: FlaskConical },
+      { href: '/scores', label: 'Scores', icon: TrendingUp },
       { href: '/datasets', label: 'Datasets', icon: Database },
       { href: '/metrics', label: 'Metrics', icon: Gauge },
       { href: '/annotations', label: 'Annotations', icon: Star },
@@ -55,7 +59,7 @@ const navGroups = [
   {
     label: 'LLM Tools',
     items: [
-      //{ href: '/prompts', label: 'Prompts', icon: FileText },
+      { href: '/prompts', label: 'Prompts', icon: FileText },
       { href: '/playground', label: 'Playground', icon: PlayCircle },
       //{ href: '/gateway', label: 'Gateway', icon: Zap },
       //{ href: '/ab-tests', label: 'A/B Tests', icon: GitCompare },
@@ -67,6 +71,7 @@ const navGroups = [
       //{ href: '/btql', label: 'BTQL Query', icon: Code2 },
       //{ href: '/alerts', label: 'Alerts', icon: Bell },
       //{ href: '/masking', label: 'Data Masking', icon: EyeOff },
+      { href: '/online-scoring', label: 'Online Scoring', icon: Target },
       { href: '/settings', label: 'Settings', icon: Settings },
       //{ href: '/settings/sso', label: 'SSO', icon: Shield },
     ],
