@@ -1,5 +1,5 @@
 """
-Configuration settings for TrustBrain backend.
+Configuration settings for Evalyx backend.
 Loads from environment variables with sensible defaults.
 """
 
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings."""
 
     # API Settings
-    API_TITLE: str = "TrustBrain Open Source"
+    API_TITLE: str = "Evalyx Open Source"
     API_VERSION: str = "0.2.0"
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
 
@@ -76,8 +76,8 @@ class Settings(BaseSettings):
     SMTP_USERNAME: Optional[str] = os.getenv("SMTP_USERNAME", None)
     SMTP_PASSWORD: Optional[str] = os.getenv("SMTP_PASSWORD", None)
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "True").lower() == "true"
-    SMTP_FROM_ADDRESS: str = os.getenv("SMTP_FROM_ADDRESS", "alerts@trustbrain.local")
-    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "TrustBrain Alerts")
+    SMTP_FROM_ADDRESS: str = os.getenv("SMTP_FROM_ADDRESS", "alerts@evalyx.local")
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "Evalyx Alerts")
 
     class Config:
         env_file = ".env"

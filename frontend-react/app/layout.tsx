@@ -3,7 +3,7 @@ import './globals.css'
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: 'TrustBrain – AI Observability Platform',
+  title: 'Evalyx – AI Observability Platform',
   description: 'Open-source LLM observability, evaluation, and prompt management',
 }
 

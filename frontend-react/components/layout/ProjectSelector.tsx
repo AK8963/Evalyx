@@ -36,7 +36,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   const setProject = (p: Project) => {
     setProjectState(p)
-    localStorage.setItem('trustbrain_project_id', p.id)
+    localStorage.setItem('evalyx_project_id', p.id)
   }
 
   return (

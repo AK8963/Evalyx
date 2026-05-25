@@ -1,11 +1,11 @@
 """
-TrustBrain End-to-End Test
+Evalyx End-to-End Test
 ==========================
 Tests the full application: auth → project → traces → evals → datasets → prompts → search.
 
 Usage:
-    python examples/test_trustbrain.py
-    python examples/test_trustbrain.py --url http://localhost:8000 --email test@example.com
+    python examples/test_Evalyx.py
+    python examples/test_Evalyx.py --url http://localhost:8000 --email test@example.com
 """
 
 import argparse
@@ -18,10 +18,10 @@ from datetime import datetime
 import requests
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-parser = argparse.ArgumentParser(description="TrustBrain end-to-end test")
+parser = argparse.ArgumentParser(description="Evalyx end-to-end test")
 parser.add_argument("--url", default="http://localhost:8000", help="API base URL")
-parser.add_argument("--email", default=f"testuser_{random.randint(1000,9999)}@trustbrain.dev")
-parser.add_argument("--name", default="TrustBrain Tester")
+parser.add_argument("--email", default=f"testuser_{random.randint(1000,9999)}@Evalyx.dev")
+parser.add_argument("--name", default="Evalyx Tester")
 args = parser.parse_args()
 
 BASE = args.url.rstrip("/")
@@ -63,7 +63,7 @@ def get(path, token=None):
 
 # ══════════════════════════════════════════════════════════════════════════════
 print(f"\n{'═' * 60}")
-print(f"  TrustBrain End-to-End Test")
+print(f"  Evalyx End-to-End Test")
 print(f"  API: {BASE}")
 print(f"  User: {EMAIL}")
 print(f"{'═' * 60}")
@@ -104,7 +104,7 @@ step("GET /auth/me", me_ok, f"id={user_id}")
 # ── 3. Projects ────────────────────────────────────────────────────────────────
 section("3. Projects")
 
-project_name = f"TrustBrain Test {datetime.now().strftime('%H%M%S')}"
+project_name = f"Evalyx Test {datetime.now().strftime('%H%M%S')}"
 r = post("/api/projects", {"name": project_name, "description": "Automated e2e test project"}, token)
 proj_ok = r.status_code == 201
 project_id = r.json().get("id") if proj_ok else None
@@ -303,9 +303,9 @@ if failed:
 
 print(f"\n{'═' * 60}")
 if failed == 0:
-    print(f"  {PASS} ALL {total} TESTS PASSED — TrustBrain is working correctly!")
+    print(f"  {PASS} ALL {total} TESTS PASSED — Evalyx is working correctly!")
 else:
-    print(f"  {FAIL} {failed} test(s) failed. Check backend logs: docker logs trustbrain_backend")
+    print(f"  {FAIL} {failed} test(s) failed. Check backend logs: docker logs evalyx_backend")
 print(f"{'═' * 60}\n")
 
 print(f"  Project created:   {project_name}")

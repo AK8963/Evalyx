@@ -5,7 +5,7 @@ const nextConfig = {
     return [
       {
         source: '/api/backend/:path*',
-        destination: `${process.env.BACKEND_API_URL || 'http://trustbrain_backend:8000'}/:path*`,
+        destination: `${process.env.BACKEND_API_URL || 'http://evalyx_backend:8000'}/:path*`,
       },
     ]
   },

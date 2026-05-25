@@ -1,9 +1,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="trustbrain",
+    name="evalyx",
     version="0.1.0",
-    description="Python SDK for the TrustBrain LLM tracing platform",
+    description="Python SDK for the Evalyx LLM tracing platform",
     packages=find_packages(),
     python_requires=">=3.9",
     install_requires=[

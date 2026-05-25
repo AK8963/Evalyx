@@ -86,10 +86,10 @@ export function Sidebar() {
     <aside className="flex flex-col w-64 min-h-screen bg-sidebar border-r border-sidebar-border shrink-0">
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-4 py-4 border-b border-sidebar-border">
-        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-base shrink-0">
-          🧠
+        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm shadow-violet-900/30">
+          <Zap className="h-4 w-4 text-white" />
         </div>
-        <span className="font-semibold text-sidebar-foreground tracking-tight">TrustBrain</span>
+        <span className="font-semibold text-sidebar-foreground tracking-tight">Evalyx</span>
       </div>
 
       {/* Nav */}

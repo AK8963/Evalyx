@@ -59,11 +59,11 @@ This starts five containers:
 
 | Container | Host Port | Internal Port | Role |
 |---|---|---|---|
-| `trustbrain_backend` | `8000` | `8000` | FastAPI REST API |
-| `trustbrain_frontend` | `3010` | `3000` | Next.js 14 React dashboard |
-| `trustbrain_postgres` | `5433` | `5432` | PostgreSQL — primary datastore |
-| `trustbrain_redis` | `6380` | `6379` | Redis — caching and rate limiting |
-| `trustbrain_qdrant` | `6333` | `6333` | Qdrant — vector store for semantic search |
+| `evalyx_backend` | `8000` | `8000` | FastAPI REST API |
+| `evalyx_frontend` | `3010` | `3000` | Next.js 14 React dashboard |
+| `evalyx_postgres` | `5433` | `5432` | PostgreSQL — primary datastore |
+| `evalyx_redis` | `6380` | `6379` | Redis — caching and rate limiting |
+| `evalyx_qdrant` | `6333` | `6333` | Qdrant — vector store for semantic search |
 
 Check that all containers are healthy:
 
@@ -102,11 +102,11 @@ Navigate to **http://localhost:3010** in your browser.
 
 1. Click **Sign In** on the login page.
 2. Enter your email address and name — no password required (JWT-based, passwordless auth).
-3. Click **Register**. A JWT is issued and stored in `localStorage` as `trustbrain_token`.
+3. Click **Register**. A JWT is issued and stored in `localStorage` as `evalyx_token`.
 4. Create your first **Project** using the project selector in the top bar.
 5. Go to **Settings → API Keys** to copy your static API key for programmatic access.
 
-> **Token storage**: The JWT is stored as `trustbrain_token` in `localStorage` and as a cookie with the same name for middleware routing. The selected project is stored as `trustbrain_project_id`.
+> **Token storage**: The JWT is stored as `evalyx_token` in `localStorage` and as a cookie with the same name for middleware routing. The selected project is stored as `evalyx_project_id`.
 
 ---
 
@@ -142,7 +142,7 @@ python examples/ollama_live_demo/live_demo.py
 
 Open http://localhost:3010/traces and hit **Refresh** to watch traces arrive in real-time. The demo runs 8 scenarios across `gemma2:2b`, `mistral:latest`, and `llama3:8b`. All Ollama traces are recorded with `cost_usd = 0.0`.
 
-To change the user or project, edit `TRUSTBRAIN_URL`, `PROJECT_NAME`, and `email` at the top of `live_demo.py`.
+To change the user or project, edit `EVALYX_URL`, `PROJECT_NAME`, and `email` at the top of `live_demo.py`.
 
 ---
 
@@ -199,21 +199,21 @@ kubectl apply -f k8s/frontend.yaml
 The database schema is created automatically by SQLAlchemy on first boot. If you see this error after adding a new column to an existing table, connect and run the migration manually:
 
 ```bash
-docker exec -it trustbrain_postgres psql -U traciq -d traciq_db
+docker exec -it evalyx_postgres psql -U traciq -d traciq_db
 -- then run your ALTER TABLE statement
 ```
 
 ### Frontend shows a blank page or "Loading…"
 
 ```bash
-docker logs trustbrain_frontend --tail 30
+docker logs evalyx_frontend --tail 30
 ```
 
 If the container started but the page is empty, the JWT token may be missing. Open the browser console and check:
 
 ```js
-localStorage.getItem('trustbrain_token')   // should not be null
-localStorage.getItem('trustbrain_project_id')
+localStorage.getItem('evalyx_token')   // should not be null
+localStorage.getItem('evalyx_project_id')
 ```
 
 If null, log in again or set them manually for testing.

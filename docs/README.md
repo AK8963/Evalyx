@@ -1,10 +1,10 @@
-# TrustBrain — Documentation Overview
+# Evalyx — Documentation Overview
 
-TrustBrain is a self-hosted LLM observability platform. It captures every input/output your AI application sends to a language model, scores them, and surfaces insights through a rich React dashboard. Think of it as a private, on-premise alternative to Braintrust or LangSmith.
+Evalyx is a self-hosted LLM observability platform. It captures every input/output your AI application sends to a language model, scores them, and surfaces insights through a rich React dashboard. Think of it as a private, on-premise alternative to Braintrust or LangSmith.
 
 ---
 
-## What TrustBrain Does
+## What Evalyx Does
 
 | Capability | Description |
 |---|---|
@@ -42,7 +42,7 @@ Your Application  (or examples/ollama_live_demo/live_demo.py)
 ┌──────────────────┐     ┌──────────────┐     ┌───────────────┐
 │  FastAPI Backend │────▶│  PostgreSQL  │     │  Qdrant       │
 │  :8000           │     │  (traces,    │     │  (vector      │
-│  trustbrain_     │     │   evals,     │     │   embeddings  │
+│  Evalyx_     │     │   evals,     │     │   embeddings  │
 │  backend         │     │   projects)  │     │   for search) │
 └──────────────────┘     └──────────────┘     └───────────────┘
       │
@@ -51,7 +51,7 @@ Your Application  (or examples/ollama_live_demo/live_demo.py)
 ┌──────────────────┐
 │  Next.js 14      │  ◀──  User opens browser at :3010
 │  React Frontend  │
-│  trustbrain_     │
+│  Evalyx_     │
 │  frontend :3010  │
 └──────────────────┘
 ```

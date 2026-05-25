@@ -1,14 +1,14 @@
 """
-TrustBrain Python SDK
+Evalyx Python SDK
 Trace ingestion and evaluation for LLM applications.
 """
 
-from .client import TrustBrainClient, Trace, Span
+from .client import EvalyxClient, Trace, Span
 from .decorators import traciq_trace, TraceContext
 
 # Convenience aliases
 trace = traciq_trace
-TrustBrain = TrustBrainClient  # canonical import alias
+Evalyx = EvalyxClient  # canonical import alias
 
 
 def score(name: str):
@@ -32,17 +32,17 @@ def score(name: str):
     return decorator
 
 
-def init(api_key: str, base_url: str = "http://localhost:8000") -> TrustBrainClient:
-    """Create and return a configured TrustBrainClient.
+def init(api_key: str, base_url: str = "http://localhost:8000") -> EvalyxClient:
+    """Create and return a configured EvalyxClient.
 
     Usage::
 
-        import trustbrain
-        client = trustbrain.init(api_key="tb_...", base_url="http://localhost:8000")
+        import evalyx
+        client = evalyx.init(api_key="tb_...", base_url="http://localhost:8000")
         client.trace(project_name="my_project", model="gpt-4o", input_data=..., output_data=...)
         client.flush()
     """
-    return TrustBrainClient(api_key=api_key, base_url=base_url)
+    return EvalyxClient(api_key=api_key, base_url=base_url)
 
 
 # Integrations (optional — only available if dependencies are installed)
@@ -58,8 +58,8 @@ __version__ = "0.1.0"
 
 __all__ = [
     # Core
-    "TrustBrainClient",
-    "TrustBrain",
+    "EvalyxClient",
+    "Evalyx",
     "Trace",
     "Span",
     "init",

@@ -110,7 +110,7 @@ QUESTIONS = [
 
 # ── main ──────────────────────────────────────────────────────────────────────
 def main():
-    print(f"\n🧠 TraceIQ × Ollama ({OLLAMA_MODEL}) demo\n")
+    print(f"\n⚡ TraceIQ × Ollama ({OLLAMA_MODEL}) demo\n")
 
     # Auto-fetch API key (no hardcoding needed)
     print("🔑 Fetching API key from TraceIQ...")

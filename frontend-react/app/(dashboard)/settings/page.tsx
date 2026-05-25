@@ -66,10 +66,10 @@ export default function SettingsPage() {
     return (form[key] as string) ?? (settings?.[key] as string) ?? ''
   }
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('trustbrain_token') ?? '' : ''
-  const sdkSnippet = `from trustbrain import TrustBrain
+  const token = typeof window !== 'undefined' ? localStorage.getItem('evalyx_token') ?? '' : ''
+  const sdkSnippet = `from Evalyx import Evalyx
 
-client = TrustBrain(
+client = Evalyx(
     api_url="${API_BASE}",
     api_key="${token ? token.slice(0, 8) + '…' : '<your-token>'}",
 )
@@ -92,7 +92,7 @@ def my_llm_call(prompt: str) -> str:
         <div>
           <h2 className="font-medium">API Integration</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Use these credentials to send traces from your application to TrustBrain.
+            Use these credentials to send traces from your application to Evalyx.
           </p>
         </div>
 
@@ -121,7 +121,7 @@ def my_llm_call(prompt: str) -> str:
             </button>
           </div>
           <p className="text-xs text-muted-foreground mt-1.5">
-            Pass this as <code className="bg-muted px-1 rounded">Authorization: Bearer &lt;token&gt;</code> header, or set <code className="bg-muted px-1 rounded">TRUSTBRAIN_API_KEY</code> env var.
+            Pass this as <code className="bg-muted px-1 rounded">Authorization: Bearer &lt;token&gt;</code> header, or set <code className="bg-muted px-1 rounded">EVALYX_API_KEY</code> env var.
           </p>
         </div>
 
@@ -142,7 +142,7 @@ def my_llm_call(prompt: str) -> str:
             </button>
           </div>
           <p className="text-xs text-muted-foreground mt-1.5">
-            Install: <code className="bg-muted px-1 rounded">pip install trustbrain</code>
+            Install: <code className="bg-muted px-1 rounded">pip install Evalyx</code>
           </p>
         </div>
       </div>

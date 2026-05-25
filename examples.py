@@ -351,7 +351,7 @@ def example_6_with_statement():
 def main():
     """Run all examples."""
     print("=" * 50)
-    print("🧠 TraceIQ SDK Examples")
+    print("⚡ TraceIQ SDK Examples")
     print("=" * 50)
     print("\nNote: These examples send traces to a local backend")
     print("Make sure backend is running at http://localhost:8000")

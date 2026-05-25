@@ -1,8 +1,8 @@
 """
-TrustBrain × Ollama — Live Demo
+Evalyx × Ollama — Live Demo
 ================================
 Runs a multi-turn, multi-model Q&A pipeline against local Ollama models and
-streams every call into TrustBrain as a trace you can watch in real-time.
+streams every call into Evalyx as a trace you can watch in real-time.
 
 Requirements:
     pip install requests httpx rich
@@ -41,7 +41,7 @@ except ImportError:
 console = Console()
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-TRUSTBRAIN_URL = "http://localhost:8000"
+EVALYX_URL = "http://localhost:8000"
 OLLAMA_URL     = "http://localhost:11434"
 PROJECT_NAME   = "My Project"
 
@@ -58,7 +58,7 @@ def login(email: str, name: str) -> str:
     """Login and return a JWT (registers first if user doesn't exist)."""
     # Try login first
     r = requests.post(
-        f"{TRUSTBRAIN_URL}/api/auth/login",
+        f"{EVALYX_URL}/api/auth/login",
         json={"email": email},
         timeout=10,
     )
@@ -66,7 +66,7 @@ def login(email: str, name: str) -> str:
         return r.json()["access_token"]
     # Fall back to register
     r = requests.post(
-        f"{TRUSTBRAIN_URL}/api/auth/register",
+        f"{EVALYX_URL}/api/auth/register",
         json={"email": email, "name": name},
         timeout=10,
     )
@@ -78,14 +78,14 @@ def get_or_create_project(jwt: str, name: str) -> str:
     """Return the project ID, creating the project if it doesn't exist."""
     h = {"Authorization": f"Bearer {jwt}"}
     # List existing
-    r = requests.get(f"{TRUSTBRAIN_URL}/api/projects", headers=h, timeout=10)
+    r = requests.get(f"{EVALYX_URL}/api/projects", headers=h, timeout=10)
     r.raise_for_status()
     for p in r.json():
         if p["name"] == name:
             return p["id"]
     # Create
     r = requests.post(
-        f"{TRUSTBRAIN_URL}/api/projects",
+        f"{EVALYX_URL}/api/projects",
         json={"name": name, "description": "Live Ollama traces demo"},
         headers=h,
         timeout=10,
@@ -136,7 +136,7 @@ def ingest_trace(jwt: str, project_id: str, model: str,
                  messages: list[dict], result: dict,
                  expected: Optional[str], tags: list[str],
                  metadata: dict) -> Optional[str]:
-    """Send one trace to TrustBrain. Returns trace ID or None on failure."""
+    """Send one trace to Evalyx. Returns trace ID or None on failure."""
     total_tok = result["prompt_tokens"] + result["completion_tokens"]
     payload = {
         "project_id": project_id,
@@ -157,7 +157,7 @@ def ingest_trace(jwt: str, project_id: str, model: str,
     }
     try:
         r = requests.post(
-            f"{TRUSTBRAIN_URL}/api/traces",
+            f"{EVALYX_URL}/api/traces",
             json=payload,
             headers={"Authorization": f"Bearer {jwt}"},
             timeout=15,
@@ -279,18 +279,18 @@ SCENARIOS = [
 def main():
     if HAS_RICH:
         console.print(Panel.fit(
-            "[bold cyan]TrustBrain × Ollama Live Demo[/bold cyan]\n"
-            f"Backend: [green]{TRUSTBRAIN_URL}[/green]   Ollama: [green]{OLLAMA_URL}[/green]\n"
+            "[bold cyan]Evalyx × Ollama Live Demo[/bold cyan]\n"
+            f"Backend: [green]{EVALYX_URL}[/green]   Ollama: [green]{OLLAMA_URL}[/green]\n"
             "Watch [bold]http://localhost:3010/traces[/bold] and hit Refresh!"
         ))
     else:
         print("=" * 60)
-        print("TrustBrain × Ollama Live Demo")
+        print("Evalyx × Ollama Live Demo")
         print(f"Dashboard → http://localhost:3010/traces")
         print("=" * 60)
 
     # Auth
-    email = "devtest@example.com"     # Change to your TrustBrain account email
+    email = "devtest@example.com"     # Change to your Evalyx account email
     console.print(f"\n[dim]Authenticating as {email}…[/dim]")
     jwt = login(email, "Ollama Demo User")
     project_id = get_or_create_project(jwt, PROJECT_NAME)

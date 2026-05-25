@@ -29,13 +29,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   const applyToken = useCallback(async (t: string) => {
-    localStorage.setItem('trustbrain_token', t)
+    localStorage.setItem('evalyx_token', t)
     setToken(t)
     try {
       const me = await api.auth.me()
       setUser(me)
     } catch {
-      localStorage.removeItem('trustbrain_token')
+      localStorage.removeItem('evalyx_token')
       setToken(null)
       setUser(null)
     }
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore session on mount
   useEffect(() => {
-    const stored = localStorage.getItem('trustbrain_token')
+    const stored = localStorage.getItem('evalyx_token')
     if (stored) {
       applyToken(stored).finally(() => setIsLoading(false))
     } else {
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(() => {
-    localStorage.removeItem('trustbrain_token')
+    localStorage.removeItem('evalyx_token')
     setToken(null)
     setUser(null)
     window.location.href = '/login'

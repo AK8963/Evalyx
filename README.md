@@ -1,10 +1,10 @@
-# 🧠 TrustBrain — Open Source AI Observability Platform
+# ⚡ Evalyx — Open Source AI Observability Platform
 
 A fully self-hosted AI observability and evaluation platform for monitoring, testing, and improving LLM applications in production.
 
-## What is TrustBrain?
+## What is Evalyx?
 
-TrustBrain helps AI teams:
+Evalyx helps AI teams:
 - **Observe** production LLM traces with full visibility into cost, latency, and quality
 - **Evaluate** outputs using LLM, code, or human scorers
 - **Compare** models and prompts side-by-side with experiment tracking
@@ -132,7 +132,7 @@ flowchart TB
 ### Project Structure
 
 ```
-TrustBrain/
+Evalyx/
 ├── backend/                    # FastAPI REST API (port 8000)
 │   ├── scoring.py              # Evaluation engine
 │   ├── routes/                 # All /api/* endpoints (20+ modules)

@@ -13,7 +13,7 @@ export function middleware(request: NextRequest) {
 
   // Token is stored client-side in localStorage; we use a cookie as the
   // server-side signal set by the login page after successful auth.
-  const token = request.cookies.get('trustbrain_token')?.value
+  const token = request.cookies.get('evalyx_token')?.value
 
   if (!token) {
     const loginUrl = new URL('/login', request.url)

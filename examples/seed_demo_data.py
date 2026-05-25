@@ -14,7 +14,7 @@ import json
 import sys
 
 BASE_URL = "http://localhost:8000"
-DEMO_EMAIL = "demo@trustbrain-demo.com"
+DEMO_EMAIL = "demo@evalyx-demo.com"
 DEMO_NAME = "Demo User"
 
 # ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ def add_dataset_items(client: httpx.Client, token: str, dataset_id: str):
 
 def main():
     print("=" * 60)
-    print("TrustBrain — Seed Demo Data")
+    print("Evalyx — Seed Demo Data")
     print("=" * 60)
 
     with httpx.Client(timeout=30) as client:

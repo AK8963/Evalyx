@@ -1,6 +1,6 @@
 # Dashboard Pages Guide
 
-This guide walks through every page in the TrustBrain dashboard — what it shows, how to use it, and what outputs you can get from it.
+This guide walks through every page in the Evalyx dashboard — what it shows, how to use it, and what outputs you can get from it.
 
 The frontend is a **Next.js 14** React application running at **http://localhost:3010**.
 
@@ -33,7 +33,7 @@ Additional pages (implemented, not yet in sidebar):
 | Review Queue | `/review` | Human review workflow for flagged traces |
 | Online Scoring | `/online-scoring` | Real-time scorer rules |
 | Prompts | `/prompts` | Version-controlled prompt templates |
-| Gateway | `/gateway` | Route LLM calls through TrustBrain |
+| Gateway | `/gateway` | Route LLM calls through Evalyx |
 | A/B Tests | `/abtests` | Compare model variants head-to-head |
 
 ---
@@ -226,7 +226,7 @@ Form fields:
 
 ## 🌐 Gateway (`/gateway`)
 
-**Purpose:** Route LLM calls through TrustBrain's unified proxy — traces every call automatically.
+**Purpose:** Route LLM calls through Evalyx's unified proxy — traces every call automatically.
 
 ### Streaming
 Tokens appear word-by-word as the model generates them. Shows live token counter and cost.
@@ -356,7 +356,7 @@ Annotations are stored and can be used as `expected_output` for future evaluatio
 
 **Purpose:** Manage API keys.
 
-### TrustBrain API Key
+### Evalyx API Key
 - Your static API key for programmatic trace ingestion.
 - Format: `traciq_<base64-random>`
 - Use in `Authorization: Bearer <key>` headers.

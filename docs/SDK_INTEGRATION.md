@@ -1,6 +1,6 @@
 # SDK & API Integration Guide
 
-This guide explains every way to send traces from your application into TrustBrain.
+This guide explains every way to send traces from your application into Evalyx.
 
 ---
 
@@ -261,7 +261,7 @@ ollama_resp = requests.post(
 ).json()
 latency_ms = (time.time() - start) * 1000
 
-# --- Send trace to TrustBrain ---
+# --- Send trace to Evalyx ---
 requests.post("http://localhost:8000/api/traces", headers=headers, json={
     "project_id": project_id,
     "model": "gemma2:2b",
